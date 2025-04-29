@@ -1,299 +1,230 @@
-import React, { useState, useEffect } from 'react';
-import MainLayout from '@/components/Layout/MainLayout';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useChat } from '@/contexts/ChatContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { UserPlus, Users, RefreshCw, MessageSquare } from 'lucide-react';
-import { ChatGroupForm } from '@/components/ChatGroupForm';
-import { NewPrivateChat } from '@/components/NewPrivateChat';
 
-const ChatsPage: React.FC = () => {
-  const { chats, activeChat, setActiveChat, sendMessage, loadingChats, loadChats } = useChat();
+/**
+ * Componente Dashboard
+ * 
+ * Esta es la página principal que se muestra a los usuarios después de iniciar sesión.
+ * Muestra un resumen del sistema con estadísticas, propuestas recientes y mensajes recientes.
+ */
+
+import MainLayout from '@/components/Layout/MainLayout';
+import { useAuth } from '@/contexts/AuthContext';
+import { useJobs } from '@/contexts/JobContext';
+import { useChat } from '@/contexts/ChatContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Briefcase, MessageCircle, Timer, ArrowRight } from 'lucide-react';
+
+const Dashboard = () => {
+  // Obtener datos del usuario autenticado
   const { currentUser } = useAuth();
   
-  const [messageContent, setMessageContent] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [isPrivateChatDialogOpen, setIsPrivateChatDialogOpen] = useState(false);
+  // Obtener listado de propuestas y estado de carga
+  const { jobs, loading: loadingJobs } = useJobs();
   
-  useEffect(() => {
-    // Scroll al mensaje más reciente cuando se selecciona un chat o se envía un mensaje
-    if (activeChat) {
-      const messagesContainer = document.getElementById('messages-container');
-      if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      }
-    }
-  }, [activeChat?.messages]);
+  // Obtener listado de chats y estado de carga
+  const { chats, loadingChats } = useChat();
 
-  // Filtrar chats por término de búsqueda
-  const filteredChats = searchTerm 
-    ? chats.filter(chat => {
-        const otherParticipants = chat.participants.filter(
-          p => p.id !== currentUser?.id
-        );
-        
-        // Si es un grupo, buscar por nombre del grupo
-        if (chat.isGroup) {
-          return chat.name.toLowerCase().includes(searchTerm.toLowerCase());
-        }
-        
-        // Si es privado, buscar por nombre del otro participante
-        return otherParticipants.some(p => 
-          p.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      })
-    : chats;
+  // Filtrar las 3 propuestas más recientes
+  const recentJobs = [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 3);
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (activeChat && messageContent.trim()) {
-      sendMessage(activeChat.id, messageContent);
-      setMessageContent('');
-    }
-  };
+  // Filtrar los 3 chats con mensajes más recientes
+  const recentChats = [...chats]
+    .filter(chat => chat.lastMessage) // Solo chats con mensajes
+    .sort((a, b) => {
+      const timestampA = a.lastMessage?.timestamp || 0;
+      const timestampB = b.lastMessage?.timestamp || 0;
+      return timestampB - timestampA; // Ordenar de más reciente a más antiguo
+    })
+    .slice(0, 3); // Tomar solo los 3 primeros
 
-  const getChatName = (chat: any) => {
-    if (chat.isGroup) return chat.name;
-    
-    const otherParticipant = chat.participants.find(
-      (p: any) => p.id !== currentUser?.id
-    );
-    
-    return otherParticipant?.name || 'Chat privado';
-  };
-
-  // Formatear la fecha y hora del último mensaje
-  const formatLastMessageTime = (timestamp: number) => {
-    if (!timestamp) return '';
-    
+  /**
+   * Función para formatear fechas en formato día/mes/año
+   */
+  const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
-    const now = new Date();
-    
-    // Si es hoy, mostrar solo la hora
-    if (date.toDateString() === now.toDateString()) {
-      return date.toLocaleTimeString('es-ES', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-    }
-    
-    // Si es ayer, mostrar "Ayer"
-    const yesterday = new Date();
-    yesterday.setDate(now.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
-      return 'Ayer';
-    }
-    
-    // Si es esta semana, mostrar el día
-    const weekStart = new Date();
-    weekStart.setDate(now.getDate() - now.getDay());
-    if (date >= weekStart) {
-      return date.toLocaleDateString('es-ES', { weekday: 'short' });
-    }
-    
-    // En otro caso, mostrar la fecha
-    return date.toLocaleDateString('es-ES', { 
-      day: '2-digit', 
-      month: '2-digit' 
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric'
     });
   };
 
   return (
     <MainLayout>
-      <div className="flex h-[calc(100vh-60px)]">
-        {/* Panel lateral de chats */}
-        <div className="w-1/3 border-r border-border flex flex-col">
-          <div className="p-4 border-b border-border">
-            <h1 className="text-xl font-bold mb-3">Mensajes</h1>
-            <Input 
-              placeholder="Buscar conversaciones..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="mb-3"
-            />
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setIsGroupDialogOpen(true)}
-                className="flex items-center text-xs"
-              >
-                <Users className="mr-1 h-4 w-4" />
-                Crear grupo
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setIsPrivateChatDialogOpen(true)}
-                className="flex items-center text-xs"
-              >
-                <UserPlus className="mr-1 h-4 w-4" />
-                Chat privado
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={loadChats}
-                className="flex items-center text-xs"
-              >
-                <RefreshCw className="mr-1 h-4 w-4" />
-                Actualizar
-              </Button>
-            </div>
-          </div>
-          
-          <ScrollArea className="flex-1">
-            {loadingChats ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Cargando conversaciones...</p>
-              </div>
-            ) : filteredChats.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No tienes ninguna conversación aún</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {filteredChats.map((chat) => (
-                  <li 
-                    key={chat.id}
-                    className={`p-3 hover:bg-accent cursor-pointer transition-colors ${
-                      activeChat?.id === chat.id ? 'bg-accent' : ''
-                    }`}
-                    onClick={() => setActiveChat(chat)}
-                  >
-                    <div className="flex justify-between mb-1">
-                      <h3 className="font-medium truncate">{getChatName(chat)}</h3>
-                      {chat.lastMessage?.timestamp && (
-                        <span className="text-xs text-muted-foreground">
-                          {formatLastMessageTime(chat.lastMessage.timestamp)}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {chat.messages && chat.messages.length > 0 
-                        ? `${chat.messages[0].senderId || 'Usuario'}: ${chat.messages[0].content}` 
-                        : 'No hay mensajes aún'}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ScrollArea>
+      <div className="space-y-8">
+        {/* Sección de bienvenida */}
+        <div className="pb-4 border-b border-gray-200">
+          <h1 className="text-2xl sm:text-3xl font-bold">¡Bienvenido, {currentUser?.name}!</h1>
+          <p className="text-gray-600 mt-2">Esto es lo que está pasando en WorkFlowConnect hoy.</p>
         </div>
         
-        {/* Área de mensajes */}
-        <div className="flex-1 flex flex-col">
-          {activeChat ? (
-            <>
-              <div className="p-3 border-b border-border">
-                <h2 className="font-semibold">{getChatName(activeChat)}</h2>
-                <p className="text-xs text-muted-foreground">
-                  {activeChat.isGroup
-                    ? `${activeChat.participants.length} participantes`
-                    : activeChat.participants.find((p: any) => p.id !== currentUser?.id)?.isOnline
-                      ? 'En línea'
-                      : 'Desconectado'
-                  }
-                </p>
+        {/* Sección de estadísticas - Muestra 3 tarjetas con resúmenes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Tarjeta de propuestas activas */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Propuestas</CardTitle>
+              <CardDescription>Propuestas activas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Briefcase className="h-8 w-8 text-wfc-purple" />
+                <span className="text-2xl font-bold ml-2">
+                  {loadingJobs ? '...' : jobs.filter(j => j.status === 'open').length}
+                </span>
               </div>
-              
-              <ScrollArea className="flex-1 p-4" id="messages-container">
-                <div className="space-y-4">
-                  {activeChat.messages && activeChat.messages.length > 0 ? (
-                    activeChat.messages.map((message: any) => (
-                      <div 
-                        key={message.id}
-                        className={`flex ${message.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div 
-                          className={`max-w-[70%] p-3 rounded-lg ${
-                            message.senderId === currentUser?.id
-                              ? 'bg-wfc-purple text-white'
-                              : 'bg-muted'
-                          }`}
-                        >
-                          {message.senderId !== currentUser?.id && (
-                            <p className="text-xs font-medium mb-1">{message.senderId || 'Usuario'}</p>
-                          )}
-                          <p>{message.content}</p>
-                          <p className="text-xs text-right mt-1 opacity-70">
-                            {new Date(message.timestamp).toLocaleTimeString('es-ES', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </p>
+            </CardContent>
+          </Card>
+          
+          {/* Tarjeta de chats activos */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Mensajes</CardTitle>
+              <CardDescription>Chats activos</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <MessageCircle className="h-8 w-8 text-wfc-purple" />
+                <span className="text-2xl font-bold ml-2">
+                  {loadingChats ? '...' : chats.length}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Tarjeta de actividad reciente */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Actividad</CardTitle>
+              <CardDescription>Última conexión</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Timer className="h-8 w-8 text-wfc-purple" />
+                <span className="text-2xl font-bold ml-2">Hoy</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Sección de propuestas recientes */}
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Propuestas recientes</h2>
+            <Link to="/jobs">
+              <Button variant="ghost" className="text-wfc-purple">
+                Ver todas <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          
+          {/* Mostrar estado de carga, mensaje si no hay propuestas, o lista de propuestas */}
+          {loadingJobs ? (
+            <div className="text-center py-8">Cargando propuestas...</div>
+          ) : recentJobs.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">No hay propuestas disponibles</p>
+              <Link to="/create-job">
+                <Button className="mt-4 bg-wfc-purple hover:bg-wfc-purple-medium">
+                  Crear propuesta
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {/* Mapear cada propuesta reciente a una tarjeta */}
+              {recentJobs.map((job) => (
+                <Link key={job.id} to={`/jobs/${job.id}`}>
+                  <Card className="hover:border-wfc-purple transition-colors">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg font-medium">{job.title}</CardTitle>
+                          <CardDescription className="text-sm">
+                            Publicado por {job.userName} • {formatDate(job.timestamp)}
+                          </CardDescription>
+                        </div>
+                        <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                          {job.status === 'open' ? 'Abierto' : job.status === 'in-progress' ? 'En progreso' : 'Completado'}
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">No hay mensajes aún</p>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-              
-              <form onSubmit={handleSendMessage} className="p-3 border-t border-border flex gap-2">
-                <Input 
-                  placeholder="Escribe un mensaje..." 
-                  value={messageContent}
-                  onChange={(e) => setMessageContent(e.target.value)}
-                  className="flex-1"
-                />
-                <Button type="submit" className="bg-wfc-purple hover:bg-wfc-purple-medium">
-                  Enviar
-                </Button>
-              </form>
-            </>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-700 text-sm line-clamp-2">{job.description}</p>
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {job.skills.slice(0, 3).map((skill, index) => (
+                          <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Sección de mensajes recientes */}
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Mensajes recientes</h2>
+            <Link to="/chats">
+              <Button variant="ghost" className="text-wfc-purple">
+                Ver todos <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          
+          {/* Mostrar estado de carga, mensaje si no hay chats, o lista de chats */}
+          {loadingChats ? (
+            <div className="text-center py-8">Cargando mensajes...</div>
+          ) : recentChats.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">No hay mensajes recientes</p>
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Selecciona un chat</h2>
-              <p className="text-muted-foreground mb-4">
-                Elige una conversación de la lista o inicia una nueva
-              </p>
-              <div className="flex gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsGroupDialogOpen(true)}
-                  className="flex items-center"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Crear chat grupal
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsPrivateChatDialogOpen(true)}
-                  className="flex items-center"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Chat privado
-                </Button>
-              </div>
+            <div className="grid gap-4">
+              {/* Mapear cada chat reciente a una tarjeta */}
+              {recentChats.map((chat) => (
+                <Link key={chat.id} to="/chats">
+                  <Card className="hover:border-wfc-purple transition-colors">
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {/* Avatar del chat (primera letra del nombre) */}
+                          <div className="h-10 w-10 rounded-full bg-wfc-purple/20 flex items-center justify-center text-wfc-purple font-semibold">
+                            {chat.isGroup ? chat.name.charAt(0) : currentUser?.id === chat.participants[0] ? 'U' : 'T'}
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="font-medium">
+                              {chat.isGroup ? chat.name : 'Chat privado'}
+                            </h3>
+                            <p className="text-sm text-gray-600 line-clamp-1">
+                              {chat.lastMessage?.content}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Hora del último mensaje */}
+                        <span className="text-xs text-gray-500">
+                          {chat.lastMessage ? new Date(chat.lastMessage.timestamp).toLocaleTimeString('es-ES', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : ''}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
             </div>
           )}
         </div>
       </div>
-      
-      {/* Diálogo para crear chat grupal */}
-      <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
-        <DialogContent>
-          <ChatGroupForm onClose={() => setIsGroupDialogOpen(false)} />
-        </DialogContent>
-      </Dialog>
-      
-      {/* Diálogo para chat privado */}
-      <Dialog open={isPrivateChatDialogOpen} onOpenChange={setIsPrivateChatDialogOpen}>
-        <DialogContent>
-          <NewPrivateChat onClose={() => setIsPrivateChatDialogOpen(false)} />
-        </DialogContent>
-      </Dialog>
     </MainLayout>
   );
 };
 
-export default ChatsPage;
+export default Dashboard;

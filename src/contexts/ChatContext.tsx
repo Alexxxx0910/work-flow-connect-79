@@ -218,16 +218,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       try {
         const response = await apiRequest('/chats');
         if (response && response.chats) {
-          // Ordena los mensajes para mostrar los más recientes primero
-          const processedChats = response.chats.map((chat: any) => ({
-            ...chat,
-            messages: chat.messages ? chat.messages.sort((a: any, b: any) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            ) : []
-          }));
-          
-          setChats(processedChats);
-          console.log("Chats cargados desde API:", processedChats.length);
+          setChats(response.chats);
+          console.log("Chats cargados desde API:", response.chats.length);
           setLoadingChats(false);
           return;
         }
@@ -250,11 +242,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setLoadingChats(false);
     }
   };
-
-  // Cargar chats iniciales cuando cambia el usuario
-  useEffect(() => {
-    loadChats();
-  }, [currentUser]);
 
   /**
    * Configurar listeners para actualizaciones de chat
@@ -288,6 +275,11 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     };
   }, [currentUser, activeChat]);
 
+  // Cargar chats iniciales cuando cambia el usuario
+  useEffect(() => {
+    loadChats();
+  }, [currentUser]);
+
   /**
    * Función auxiliar para obtener un chat específico por ID
    */
@@ -317,37 +309,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         // Si no hay socket, intentar con la API REST
         const response = await apiRequest(`/chats/${chatId}/messages`, 'POST', { content });
         console.log("Mensaje enviado mediante API REST:", response);
-        
-        // Actualizar el chat con el mensaje enviado
-        if (response && response.chatMessage) {
-          // Actualizar inmediatamente el UI sin esperar recargar todos los chats
-          setChats(prevChats => {
-            return prevChats.map(chat => {
-              if (chat.id === chatId) {
-                const updatedMessages = [response.chatMessage, ...chat.messages];
-                return {
-                  ...chat,
-                  messages: updatedMessages,
-                  lastMessage: response.chatMessage
-                };
-              }
-              return chat;
-            });
-          });
-          
-          // Si el chat está activo, actualizar también el activeChat
-          if (activeChat && activeChat.id === chatId) {
-            setActiveChat(prevChat => {
-              if (!prevChat) return null;
-              return {
-                ...prevChat,
-                messages: [response.chatMessage, ...prevChat.messages],
-                lastMessage: response.chatMessage
-              };
-            });
-          }
-        }
-        
         return;
       } catch (apiError) {
         console.warn("No se pudo enviar mensaje a través de API, usando fallback:", apiError);
@@ -380,12 +341,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     try {
       // Intentar crear chat a través de la API real
       try {
-        const isGroup = participantIds.length > 2 || !!name;
-        
         const response = await apiRequest('/chats', 'POST', { 
           participantIds, 
           name, 
-          isGroup
+          isGroup: participantIds.length > 2 || !!name 
         });
         
         if (response && response.chat) {
@@ -409,9 +368,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       // Actualizar el chat activo inmediatamente
       setActiveChat(newChat);
-      
-      // Refrescar la lista de chats
-      await loadChats();
     } catch (error) {
       console.error("Error al crear chat:", error);
       toast({
@@ -440,7 +396,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       }
       
       // Si no existe, crear un nuevo chat privado
-      console.log("Creando nuevo chat privado con usuario:", participantId, participantName);
+      console.log("Creando nuevo chat privado con usuario:", participantId);
       
       // Intentar crear chat a través de la API real
       try {
@@ -471,9 +427,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       console.log("Nuevo chat privado creado (fallback):", newChat);
       
       setActiveChat(newChat);
-      
-      // Refrescar la lista de chats para incluir el nuevo chat
-      await loadChats();
     } catch (error) {
       console.error("Error al crear chat privado:", error);
       toast({
@@ -516,11 +469,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // Fallback al servicio temporal
       const success = await addServiceParticipantToChat(chatId, participantId);
       console.log(`Participante ${participantId} añadido al chat ${chatId} (fallback)`);
-      
-      // Refrescar la lista de chats
-      if (success) {
-        await loadChats();
-      }
       
       return success;
     } catch (error) {
