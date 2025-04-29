@@ -21,7 +21,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
   const [error, setError] = useState<string | null>(null);
   
   const { currentUser } = useAuth();
-  const { createPrivateChat, chats } = useChat();
+  const { createPrivateChat, chats, findExistingPrivateChat } = useChat();
 
   // Cargar usuarios de la base de datos
   useEffect(() => {
@@ -59,7 +59,22 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
 
   const handleStartChat = async (userId: string, userName: string) => {
     try {
-      // Crear o encontrar chat privado con este usuario
+      // Verificar si ya existe un chat con este usuario
+      const existingChat = findExistingPrivateChat(userId);
+      
+      if (existingChat) {
+        toast({
+          title: "Chat existente",
+          description: `Ya tienes un chat con ${userName}`
+        });
+        
+        // Usar el chat existente
+        await createPrivateChat(userId, userName);
+        onClose();
+        return;
+      }
+      
+      // Crear nuevo chat privado con este usuario
       await createPrivateChat(userId, userName);
       
       toast({

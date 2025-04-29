@@ -12,7 +12,9 @@ export const initializeSocket = () => {
       auth: {
         token
       },
-      transports: ['websocket']
+      transports: ['websocket'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
 
     console.log('Socket inicializado');
@@ -27,6 +29,10 @@ export const initializeSocket = () => {
 
     socket.on('connect_error', (error) => {
       console.error('Error de conexión del socket:', error.message);
+    });
+    
+    socket.on('error', (error) => {
+      console.error('Error de socket:', error);
     });
   }
 
