@@ -59,8 +59,8 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
 
   const handleStartChat = async (userId: string, userName: string) => {
     try {
-      // Buscar si ya existe un chat privado con este usuario
-      await createPrivateChat(userId);
+      // Crear o encontrar chat privado con este usuario
+      await createPrivateChat(userId, userName);
       
       toast({
         title: "Chat con " + userName,

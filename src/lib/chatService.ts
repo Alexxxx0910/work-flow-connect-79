@@ -19,7 +19,7 @@ const MOCK_USERS: Record<string, {name: string, photoURL: string, role: string}>
 let CHATS: ChatType[] = [
   {
     id: "chat1",
-    name: "",
+    name: "Juan Pérez",  // Nombre del usuario con el que se chatea
     participants: [
       { id: "user1", name: "Juan Pérez", photoURL: "", isOnline: true },
       { id: "user3", name: "Empresa ABC", photoURL: "", isOnline: false }
@@ -130,9 +130,20 @@ export const createChat = async (participantIds: string[], name = ""): Promise<C
   // Convertir IDs de participantes a objetos de participante
   const participants = participantIds.map(id => getUserInfo(id));
   
+  // Para chats privados, usar el nombre del otro participante como nombre del chat
+  let chatName = name;
+  if (!isGroup && participantIds.length === 2) {
+    // Encontrar el participante que no es el creador del chat (asumimos que el primer ID es el creador)
+    const otherParticipantId = participantIds[1];
+    const otherParticipant = participants.find(p => p.id === otherParticipantId);
+    if (otherParticipant) {
+      chatName = otherParticipant.name;
+    }
+  }
+  
   const newChat: ChatType = {
     id: `chat${Date.now()}`,
-    name,
+    name: chatName,
     participants,
     messages: [],
     isGroup
@@ -164,7 +175,7 @@ export const sendMessage = async (chatId: string, senderId: string, content: str
     timestamp: Date.now()
   };
   
-  CHATS[chatIndex].messages.unshift(newMessage);
+  CHATS[chatIndex].messages.push(newMessage);
   CHATS[chatIndex].lastMessage = newMessage;
   
   // Notificar a los listeners sobre el cambio
@@ -199,7 +210,7 @@ export const addParticipantToChat = async (chatId: string, participantId: string
     timestamp: Date.now()
   };
   
-  CHATS[chatIndex].messages.unshift(systemMessage);
+  CHATS[chatIndex].messages.push(systemMessage);
   CHATS[chatIndex].lastMessage = systemMessage;
   
   // Notificar a los listeners sobre el cambio
