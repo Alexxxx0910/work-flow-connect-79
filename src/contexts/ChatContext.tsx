@@ -16,22 +16,30 @@ import {
   createChat as createServiceChat,
   sendMessage as sendServiceMessage,
   addParticipantToChat as addServiceParticipantToChat,
-  setupChatListener
+  setupChatListener,
+  getChatById
 } from '@/lib/chatService';
 import { toast } from '@/components/ui/use-toast';
 
 // Definición de tipos para mensajes y chats
-export type MessageType = {
+export interface MessageType {
   id: string;           // ID único del mensaje
   senderId: string;     // ID del usuario que envió el mensaje
   content: string;      // Contenido del mensaje
   timestamp: number;    // Timestamp cuando se envió el mensaje
 };
 
-export type ChatType = {
+export interface ChatParticipant {
+  id: string;
+  name: string;
+  photoURL?: string;
+  isOnline?: boolean;
+}
+
+export interface ChatType {
   id: string;           // ID único del chat
   name: string;         // Nombre del chat (para chats grupales)
-  participants: string[]; // Array de IDs de usuarios participantes
+  participants: ChatParticipant[]; // Participantes en el chat
   messages: MessageType[]; // Array de mensajes en el chat
   isGroup: boolean;     // Indica si es un chat grupal o privado
   lastMessage?: MessageType; // Último mensaje enviado (para mostrar vistas previas)
@@ -43,7 +51,7 @@ interface ChatContextType {
   activeChat: ChatType | null; // Chat actualmente seleccionado
   setActiveChat: (chat: ChatType | null) => void; // Función para cambiar el chat activo
   sendMessage: (chatId: string, content: string) => void; // Enviar mensaje a un chat
-  createChat: (participantIds: string[], name?: string) => void; // Crear un nuevo chat
+  createChat: (participantIds: string[], name?: string) => Promise<void>; // Crear un nuevo chat
   createPrivateChat: (participantId: string) => Promise<void>; // Crear un chat privado 1:1
   getChat: (chatId: string) => ChatType | undefined; // Obtener un chat por ID
   loadingChats: boolean; // Estado de carga de chats
@@ -99,8 +107,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     return chats.find(
       chat => !chat.isGroup && 
       chat.participants.length === 2 && 
-      chat.participants.includes(currentUser.id) && 
-      chat.participants.includes(participantId)
+      chat.participants.some(p => p.id === currentUser.id) && 
+      chat.participants.some(p => p.id === participantId)
     );
   };
 
@@ -146,7 +154,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       // Filtrar solo los chats donde el usuario es participante
       const userChats = updatedChats.filter(chat => 
-        chat.participants.includes(currentUser.id)
+        chat.participants.some(p => p.id === currentUser.id)
       );
       
       setChats(userChats);
@@ -269,7 +277,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       if (!chat) return false;
       
       // Comprobar si el usuario ya está en el chat
-      if (chat.participants.includes(participantId)) return false;
+      if (chat.participants.some(p => p.id === participantId)) return false;
       
       // Añadir participante
       const success = await addServiceParticipantToChat(chatId, participantId);

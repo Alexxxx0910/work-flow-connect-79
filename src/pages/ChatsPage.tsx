@@ -12,7 +12,7 @@ import { ChatGroupForm } from '@/components/ChatGroupForm';
 import { NewPrivateChat } from '@/components/NewPrivateChat';
 
 const ChatsPage: React.FC = () => {
-  const { chats, selectedChat, selectChat, sendMessage, loading, fetchChats } = useChat();
+  const { chats, activeChat, setActiveChat, sendMessage, loadingChats, loadChats } = useChat();
   const { currentUser } = useAuth();
   
   const [messageContent, setMessageContent] = useState('');
@@ -22,13 +22,13 @@ const ChatsPage: React.FC = () => {
   
   useEffect(() => {
     // Scroll al mensaje más reciente cuando se selecciona un chat o se envía un mensaje
-    if (selectedChat) {
+    if (activeChat) {
       const messagesContainer = document.getElementById('messages-container');
       if (messagesContainer) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
     }
-  }, [selectedChat?.messages]);
+  }, [activeChat?.messages]);
 
   // Filtrar chats por término de búsqueda
   const filteredChats = searchTerm 
@@ -51,8 +51,8 @@ const ChatsPage: React.FC = () => {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedChat && messageContent.trim()) {
-      sendMessage(selectedChat.id, messageContent);
+    if (activeChat && messageContent.trim()) {
+      sendMessage(activeChat.id, messageContent);
       setMessageContent('');
     }
   };
@@ -138,7 +138,7 @@ const ChatsPage: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={fetchChats}
+                onClick={loadChats}
                 className="flex items-center text-xs"
               >
                 <RefreshCw className="mr-1 h-4 w-4" />
@@ -148,7 +148,7 @@ const ChatsPage: React.FC = () => {
           </div>
           
           <ScrollArea className="flex-1">
-            {loading ? (
+            {loadingChats ? (
               <div className="flex items-center justify-center h-full">
                 <p>Cargando conversaciones...</p>
               </div>
@@ -162,21 +162,21 @@ const ChatsPage: React.FC = () => {
                   <li 
                     key={chat.id}
                     className={`p-3 hover:bg-accent cursor-pointer transition-colors ${
-                      selectedChat?.id === chat.id ? 'bg-accent' : ''
+                      activeChat?.id === chat.id ? 'bg-accent' : ''
                     }`}
-                    onClick={() => selectChat(chat.id)}
+                    onClick={() => setActiveChat(chat)}
                   >
                     <div className="flex justify-between mb-1">
                       <h3 className="font-medium truncate">{getChatName(chat)}</h3>
-                      {chat.lastMessageAt && (
+                      {chat.lastMessage?.timestamp && (
                         <span className="text-xs text-muted-foreground">
-                          {formatLastMessageTime(chat.lastMessageAt)}
+                          {formatLastMessageTime(chat.lastMessage.timestamp)}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
                       {chat.messages && chat.messages.length > 0 
-                        ? `${chat.messages[0].user?.name || 'Usuario'}: ${chat.messages[0].content}` 
+                        ? `${chat.messages[0].senderId || 'Usuario'}: ${chat.messages[0].content}` 
                         : 'No hay mensajes aún'}
                     </p>
                   </li>
@@ -188,14 +188,14 @@ const ChatsPage: React.FC = () => {
         
         {/* Área de mensajes */}
         <div className="flex-1 flex flex-col">
-          {selectedChat ? (
+          {activeChat ? (
             <>
               <div className="p-3 border-b border-border">
-                <h2 className="font-semibold">{getChatName(selectedChat)}</h2>
+                <h2 className="font-semibold">{getChatName(activeChat)}</h2>
                 <p className="text-xs text-muted-foreground">
-                  {selectedChat.isGroup
-                    ? `${selectedChat.participants.length} participantes`
-                    : selectedChat.participants.find((p: any) => p.id !== currentUser?.id)?.isOnline
+                  {activeChat.isGroup
+                    ? `${activeChat.participants.length} participantes`
+                    : activeChat.participants.find((p: any) => p.id !== currentUser?.id)?.isOnline
                       ? 'En línea'
                       : 'Desconectado'
                   }
@@ -204,25 +204,25 @@ const ChatsPage: React.FC = () => {
               
               <ScrollArea className="flex-1 p-4" id="messages-container">
                 <div className="space-y-4">
-                  {selectedChat.messages && selectedChat.messages.length > 0 ? (
-                    selectedChat.messages.map((message: any) => (
+                  {activeChat.messages && activeChat.messages.length > 0 ? (
+                    activeChat.messages.map((message: any) => (
                       <div 
                         key={message.id}
-                        className={`flex ${message.user?.id === currentUser?.id ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${message.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}
                       >
                         <div 
                           className={`max-w-[70%] p-3 rounded-lg ${
-                            message.user?.id === currentUser?.id
+                            message.senderId === currentUser?.id
                               ? 'bg-wfc-purple text-white'
                               : 'bg-muted'
                           }`}
                         >
-                          {message.user?.id !== currentUser?.id && (
-                            <p className="text-xs font-medium mb-1">{message.user?.name || 'Usuario'}</p>
+                          {message.senderId !== currentUser?.id && (
+                            <p className="text-xs font-medium mb-1">{message.senderId || 'Usuario'}</p>
                           )}
                           <p>{message.content}</p>
                           <p className="text-xs text-right mt-1 opacity-70">
-                            {new Date(message.createdAt).toLocaleTimeString('es-ES', { 
+                            {new Date(message.timestamp).toLocaleTimeString('es-ES', { 
                               hour: '2-digit', 
                               minute: '2-digit' 
                             })}

@@ -21,7 +21,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
   const [error, setError] = useState<string | null>(null);
   
   const { currentUser } = useAuth();
-  const { createChat } = useChat();
+  const { createPrivateChat, chats } = useChat();
 
   // Cargar usuarios de la base de datos
   useEffect(() => {
@@ -57,14 +57,14 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       )
     : users;
 
-  const handleStartChat = async (userId: string) => {
+  const handleStartChat = async (userId: string, userName: string) => {
     try {
-      // Crear un chat privado con el usuario seleccionado
-      await createChat([userId]);
+      // Buscar si ya existe un chat privado con este usuario
+      await createPrivateChat(userId);
       
       toast({
-        title: "Chat creado",
-        description: "Se ha iniciado un nuevo chat privado"
+        title: "Chat con " + userName,
+        description: "Se ha iniciado un chat con " + userName
       });
       
       onClose();
@@ -101,7 +101,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
               <li 
                 key={user.id}
                 className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
-                onClick={() => handleStartChat(user.id)}
+                onClick={() => handleStartChat(user.id, user.name)}
               >
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
