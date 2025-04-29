@@ -12,5 +12,6 @@ router.get('/:chatId', chatController.getChat);
 router.post('/:chatId/messages', chatController.sendMessage);
 router.post('/:chatId/participants', chatController.addParticipant);
 router.delete('/:chatId/leave', chatController.leaveChat);
+router.get('/:chatId/messages', chatController.getChatMessages);
 
 module.exports = router;

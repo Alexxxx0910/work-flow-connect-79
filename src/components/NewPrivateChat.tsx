@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from '@/components/ui/use-toast';
 import axios from 'axios';
+import { Loader2 } from 'lucide-react';
 
 interface User {
   id: string;
@@ -18,10 +19,11 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [creatingChat, setCreatingChat] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const { currentUser } = useAuth();
-  const { createPrivateChat, chats } = useChat();
+  const { createPrivateChat, chats, findExistingPrivateChat } = useChat();
 
   // Cargar usuarios de la base de datos
   useEffect(() => {
@@ -59,13 +61,29 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
 
   const handleStartChat = async (userId: string, userName: string) => {
     try {
-      // Crear o encontrar chat privado con este usuario
-      await createPrivateChat(userId, userName);
+      setCreatingChat(true);
       
-      toast({
-        title: "Chat con " + userName,
-        description: "Se ha iniciado un chat con " + userName
-      });
+      // Verificar si ya existe un chat con este usuario
+      const existingChat = findExistingPrivateChat(userId);
+      
+      if (existingChat) {
+        console.log("Redirigiendo a chat existente:", existingChat);
+        await createPrivateChat(userId, userName);
+        
+        toast({
+          title: "Chat existente",
+          description: `Continuando conversación con ${userName}`
+        });
+      } else {
+        // Crear nuevo chat privado con este usuario
+        console.log("Creando nuevo chat con usuario:", userId, userName);
+        await createPrivateChat(userId, userName);
+        
+        toast({
+          title: "Chat con " + userName,
+          description: "Se ha iniciado un chat con " + userName
+        });
+      }
       
       onClose();
     } catch (error) {
@@ -75,6 +93,8 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
         title: "Error",
         description: "No se pudo crear el chat privado"
       });
+    } finally {
+      setCreatingChat(false);
     }
   };
 
@@ -101,7 +121,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
               <li 
                 key={user.id}
                 className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
-                onClick={() => handleStartChat(user.id, user.name)}
+                onClick={() => !creatingChat && handleStartChat(user.id, user.name)}
               >
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
@@ -115,6 +135,9 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
                     <div className="text-xs text-gray-500">{user.role}</div>
                   </div>
                 </div>
+                {creatingChat && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
               </li>
             ))}
           </ul>
