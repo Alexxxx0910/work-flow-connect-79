@@ -1,17 +1,18 @@
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/router';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Separator } from "@/components/ui/separator"
-import { Shell } from '@/components/Shell';
+import { useNavigate } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import MainLayout from '@/components/Layout/MainLayout';
 import { ChatType, useChat, ChatParticipant } from '@/contexts/ChatContext';
 import { NewPrivateChat } from '@/components/NewPrivateChat';
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2, Plus, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,16 +21,16 @@ import { toast } from '@/components/ui/use-toast';
 const Dashboard = () => {
   const { currentUser, loading: authLoading } = useAuth();
   const { chats, activeChat, setActiveChat, sendMessage, loadingChats, onlineUsers } = useChat();
-  const router = useRouter();
+  const navigate = useNavigate();
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!currentUser && !authLoading) {
-      router.push('/login');
+      navigate('/login');
     }
-  }, [currentUser, authLoading, router]);
+  }, [currentUser, authLoading, navigate]);
 
   if (authLoading) {
     return <div>Cargando...</div>;
@@ -160,7 +161,7 @@ const Dashboard = () => {
   };
 
   return (
-    <Shell>
+    <MainLayout>
       <div className="grid md:grid-cols-4 grid-cols-1 gap-4">
         <div className="md:col-span-1">
           <div className="p-4">
@@ -189,7 +190,7 @@ const Dashboard = () => {
         </div>
         <div className="md:col-span-3">{renderContent()}</div>
       </div>
-    </Shell>
+    </MainLayout>
   );
 };
 
