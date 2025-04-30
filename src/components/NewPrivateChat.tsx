@@ -30,7 +30,11 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:5000/api/users/search');
+        const response = await axios.get('http://localhost:5000/api/users/search', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
         
         // Filtrar para no incluir al usuario actual
         if (currentUser) {
@@ -44,6 +48,15 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       } catch (err) {
         console.error("Error al cargar usuarios:", err);
         setError("No se pudieron cargar los usuarios. Verifica tu conexión.");
+        
+        // Usar usuarios de ejemplo para desarrollo
+        const mockUsers = [
+          { id: '1', name: 'Ana Pérez', photoURL: '', role: 'Diseñador' },
+          { id: '2', name: 'Carlos López', photoURL: '', role: 'Desarrollador' },
+          { id: '3', name: 'María Rodríguez', photoURL: '', role: 'Project Manager' },
+        ];
+        setUsers(mockUsers);
+        console.info("Usuarios mock cargados");
       } finally {
         setLoading(false);
       }
@@ -68,12 +81,13 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       
       if (existingChat) {
         console.log("Redirigiendo a chat existente:", existingChat);
-        await createPrivateChat(userId, userName);
         
         toast({
           title: "Chat existente",
           description: `Continuando conversación con ${userName}`
         });
+        
+        onClose();
       } else {
         // Crear nuevo chat privado con este usuario
         console.log("Creando nuevo chat con usuario:", userId, userName);
@@ -83,9 +97,10 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
           title: "Chat con " + userName,
           description: "Se ha iniciado un chat con " + userName
         });
+        
+        onClose();
       }
       
-      onClose();
     } catch (error) {
       console.error("Error al crear chat:", error);
       toast({

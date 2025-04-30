@@ -1,4 +1,3 @@
-
 const { Chat, User, Message } = require('../models');
 const { Op } = require('sequelize');
 
@@ -433,6 +432,72 @@ exports.leaveChat = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error al abandonar chat',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Obtener mensajes de un chat específico
+ */
+exports.getChatMessages = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    
+    // Verificar que el chat existe
+    const chat = await Chat.findByPk(chatId);
+    if (!chat) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chat no encontrado'
+      });
+    }
+    
+    // Verificar que el usuario es participante
+    const isParticipant = await chat.hasParticipant(userId);
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes acceso a este chat'
+      });
+    }
+    
+    // Obtener mensajes del chat
+    const messages = await Message.findAll({
+      where: { chatId },
+      order: [['createdAt', 'ASC']],
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'photoURL']
+        }
+      ]
+    });
+    
+    // Marcar mensajes como leídos
+    await Message.update(
+      { read: true },
+      {
+        where: {
+          chatId,
+          userId: { [Op.ne]: userId },
+          read: false
+        }
+      }
+    );
+    
+    return res.status(200).json({
+      success: true,
+      messages
+    });
+    
+  } catch (error) {
+    console.error('Error al obtener mensajes del chat:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener mensajes del chat',
       error: error.message
     });
   }
