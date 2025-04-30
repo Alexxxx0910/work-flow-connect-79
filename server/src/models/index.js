@@ -37,8 +37,9 @@ User.belongsToMany(Job, { through: 'SavedJobs', as: 'savedJobs', foreignKey: 'us
 Job.belongsToMany(User, { through: 'SavedJobs', as: 'savedBy', foreignKey: 'jobId' });
 
 // Chats - Users (Muchos usuarios pueden participar en muchos chats)
+// CORREGIDO: Consistencia en nombres de columnas (usando lowercase)
 User.belongsToMany(Chat, { through: 'ChatParticipants', as: 'chats', foreignKey: 'userId' });
-Chat.belongsToMany(User, { through: 'ChatParticipants', as: 'participants', foreignKey: 'ChatId' });
+Chat.belongsToMany(User, { through: 'ChatParticipants', as: 'participants', foreignKey: 'chatId' });
 
 // Chats - Messages (Un chat puede tener muchos mensajes)
 Chat.hasMany(Message, { foreignKey: 'chatId', as: 'messages', onDelete: 'CASCADE' });

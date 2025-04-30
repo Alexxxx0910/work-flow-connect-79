@@ -21,7 +21,8 @@ const Chat = sequelize.define('Chat', {
     defaultValue: DataTypes.NOW
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  tableName: 'Chats' // Especificar el nombre de la tabla
 });
 
 module.exports = Chat;

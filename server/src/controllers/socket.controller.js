@@ -72,13 +72,20 @@ const initSocket = (io) => {
           include: [{
             model: User,
             as: 'participants',
-            where: { id: user.id }
+            where: { id: user.id },
+            attributes: ['id', 'name'],
+            through: { attributes: [] } // No incluir atributos de la tabla intermedia
           }]
         });
         
-        userChats.forEach(chat => {
-          socket.join(`chat:${chat.id}`);
-        });
+        if (userChats && userChats.length > 0) {
+          userChats.forEach(chat => {
+            socket.join(`chat:${chat.id}`);
+            console.log(`Usuario ${user.name} unido a la sala chat:${chat.id}`);
+          });
+        } else {
+          console.log(`No se encontraron chats para el usuario ${user.name}`);
+        }
       } catch (error) {
         console.error('Error al unir usuario a las salas de chat:', error);
       }
@@ -96,8 +103,8 @@ const initSocket = (io) => {
           }
           
           // Verificar que el usuario es participante
-          const isParticipant = await chat.hasParticipant(user.id);
-          if (!isParticipant) {
+          const participants = await chat.getParticipants({ where: { id: user.id } });
+          if (participants.length === 0) {
             socket.emit('error', { message: 'No tienes acceso a este chat' });
             return;
           }

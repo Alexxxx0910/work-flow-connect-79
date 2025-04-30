@@ -59,9 +59,10 @@ const startServer = async () => {
     
     if (isConnected) {
       // Sincronizar modelos con la base de datos
-      // Cambiamos de alter:true a force:false para evitar que intente modificar restricciones
-      await sequelize.sync({ force: false });
-      console.log('Modelos sincronizados con la base de datos.');
+      // Cambiamos a force:true temporalmente para recrear las tablas con las columnas correctas
+      // NOTA: Esto eliminará todos los datos existentes en la DB, usar solo para desarrollo
+      await sequelize.sync({ force: true });
+      console.log('Modelos sincronizados con la base de datos. Tablas recreadas.');
       
       // Iniciar el servidor HTTP
       server.listen(PORT, () => {
