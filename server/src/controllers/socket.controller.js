@@ -67,15 +67,15 @@ const initSocket = (io) => {
       
       // Unirse a las salas de chat del usuario
       try {
-        // Obtener chats del usuario usando la asociación correcta
-        const userChats = await Chat.findAll({
-          include: [{
-            model: User,
-            as: 'participants',
-            where: { id: user.id },
-            attributes: ['id', 'name'],
-            through: { attributes: [] } // No incluir atributos de la tabla intermedia
-          }]
+        // Utilizamos una consulta SQL directa para obtener los chats del usuario
+        const [userChats] = await sequelize.query(`
+          SELECT c.*
+          FROM "Chats" AS c
+          JOIN "ChatParticipants" AS cp ON c.id = cp."chatId"
+          WHERE cp."userId" = :userId
+        `, {
+          replacements: { userId: user.id },
+          type: sequelize.QueryTypes.SELECT
         });
         
         if (userChats && userChats.length > 0) {
@@ -102,9 +102,16 @@ const initSocket = (io) => {
             return;
           }
           
-          // Verificar que el usuario es participante
-          const participants = await chat.getParticipants({ where: { id: user.id } });
-          if (participants.length === 0) {
+          // Verificar que el usuario es participante usando una consulta directa
+          const [isParticipant] = await sequelize.query(`
+            SELECT 1 FROM "ChatParticipants" 
+            WHERE "chatId" = :chatId AND "userId" = :userId
+          `, {
+            replacements: { chatId, userId: user.id },
+            type: sequelize.QueryTypes.SELECT
+          });
+          
+          if (!isParticipant) {
             socket.emit('error', { message: 'No tienes acceso a este chat' });
             return;
           }
@@ -193,7 +200,14 @@ const initSocket = (io) => {
           }
           
           // Verificar que el usuario es participante
-          const isParticipant = await chat.hasParticipant(user.id);
+          const [isParticipant] = await sequelize.query(`
+            SELECT 1 FROM "ChatParticipants" 
+            WHERE "chatId" = :chatId AND "userId" = :userId
+          `, {
+            replacements: { chatId, userId: user.id },
+            type: sequelize.QueryTypes.SELECT
+          });
+          
           if (!isParticipant) {
             socket.emit('error', { message: 'No tienes acceso a este chat' });
             return;
