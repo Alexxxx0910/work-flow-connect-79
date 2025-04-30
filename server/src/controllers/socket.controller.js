@@ -66,10 +66,22 @@ const initSocket = (io) => {
       });
       
       // Unirse a las salas de chat del usuario
-      const userChats = await user.getChats();
-      userChats.forEach(chat => {
-        socket.join(`chat:${chat.id}`);
-      });
+      try {
+        // Obtener chats del usuario usando la asociación correcta
+        const userChats = await Chat.findAll({
+          include: [{
+            model: User,
+            as: 'participants',
+            where: { id: user.id }
+          }]
+        });
+        
+        userChats.forEach(chat => {
+          socket.join(`chat:${chat.id}`);
+        });
+      } catch (error) {
+        console.error('Error al unir usuario a las salas de chat:', error);
+      }
       
       // Manejar envío de mensajes
       socket.on('send_message', async (data) => {

@@ -73,6 +73,8 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
     : users;
 
   const handleStartChat = async (userId: string, userName: string) => {
+    if (creatingChat) return; // Evitar múltiples clics
+    
     try {
       setCreatingChat(true);
       
@@ -106,7 +108,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo crear el chat privado"
+        description: "No se pudo crear el chat privado. Por favor, inténtalo de nuevo más tarde."
       });
     } finally {
       setCreatingChat(false);
@@ -125,7 +127,10 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
 
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
-          <div className="text-center py-4">Cargando usuarios...</div>
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-wfc-purple" />
+            <span className="ml-2">Cargando usuarios...</span>
+          </div>
         ) : error ? (
           <div className="text-center py-4 text-red-500">{error}</div>
         ) : filteredUsers.length === 0 ? (
@@ -135,7 +140,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
             {filteredUsers.map(user => (
               <li 
                 key={user.id}
-                className="flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
+                className={`flex items-center justify-between p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors ${creatingChat ? 'opacity-70' : 'cursor-pointer'}`}
                 onClick={() => !creatingChat && handleStartChat(user.id, user.name)}
               >
                 <div className="flex items-center gap-2">

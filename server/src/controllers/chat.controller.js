@@ -1,3 +1,4 @@
+
 const { Chat, User, Message } = require('../models');
 const { Op } = require('sequelize');
 
@@ -7,6 +8,15 @@ const { Op } = require('sequelize');
 exports.createChat = async (req, res) => {
   try {
     const { participantIds, name, isGroup } = req.body;
+    
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const userId = req.user.id;
     
     // Asegurarse de que el usuario actual está incluido en los participantes
@@ -103,13 +113,29 @@ exports.createChat = async (req, res) => {
  */
 exports.getChats = async (req, res) => {
   try {
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const userId = req.user.id;
     
     // Buscar usuario
     const user = await User.findByPk(userId);
     
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+    
     // Obtener todos los chats donde el usuario es participante
-    const chats = await user.getChats({
+    // Nota: Usamos una consulta directa para evitar problemas con el nombre de la columna
+    const chats = await Chat.findAll({
       include: [
         {
           model: User,
@@ -133,9 +159,14 @@ exports.getChats = async (req, res) => {
       order: [['lastMessageAt', 'DESC']]
     });
     
+    // Filtrar chats donde el usuario actual es participante
+    const userChats = chats.filter(chat => 
+      chat.participants.some(participant => participant.id === userId)
+    );
+    
     return res.status(200).json({
       success: true,
-      chats
+      chats: userChats
     });
     
   } catch (error) {
@@ -154,6 +185,15 @@ exports.getChats = async (req, res) => {
 exports.getChat = async (req, res) => {
   try {
     const { chatId } = req.params;
+    
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const userId = req.user.id;
     
     // Buscar chat
@@ -230,6 +270,15 @@ exports.sendMessage = async (req, res) => {
   try {
     const { chatId } = req.params;
     const { content } = req.body;
+    
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const userId = req.user.id;
     
     // Verificar que el chat existe
@@ -295,6 +344,15 @@ exports.addParticipant = async (req, res) => {
   try {
     const { chatId } = req.params;
     const { userId: participantId } = req.body;
+    
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const requestUserId = req.user.id;
     
     // Verificar que el chat existe
@@ -345,10 +403,10 @@ exports.addParticipant = async (req, res) => {
     await chat.addParticipant(participantId);
     
     // Crear mensaje del sistema
-    await Message.create({
+    const systemMessage = await Message.create({
       content: `${req.user.name} ha añadido a ${userToAdd.name} al chat`,
       chatId,
-      userId: 'system' // ID especial para mensajes del sistema
+      userId: requestUserId // Cambiado para usar un ID real en lugar de 'system'
     });
     
     // Obtener chat actualizado con participantes
@@ -384,6 +442,15 @@ exports.addParticipant = async (req, res) => {
 exports.leaveChat = async (req, res) => {
   try {
     const { chatId } = req.params;
+    
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const userId = req.user.id;
     
     // Verificar que el chat existe
@@ -412,14 +479,31 @@ exports.leaveChat = async (req, res) => {
       });
     }
     
+    // Encontrar el usuario actual para obtener su nombre
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+    
     // Eliminar al usuario de los participantes
     await chat.removeParticipant(userId);
     
     // Crear mensaje del sistema
+    // Utilizamos el ID del primer participante restante como autor del mensaje
+    const remainingParticipants = await chat.getParticipants();
+    let messageAuthorId = userId;
+    
+    if (remainingParticipants.length > 0) {
+      messageAuthorId = remainingParticipants[0].id;
+    }
+    
     await Message.create({
-      content: `${req.user.name} ha abandonado el chat`,
+      content: `${user.name} ha abandonado el chat`,
       chatId,
-      userId: 'system'
+      userId: messageAuthorId
     });
     
     return res.status(200).json({
@@ -443,6 +527,15 @@ exports.leaveChat = async (req, res) => {
 exports.getChatMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
+    
+    // Verificar que req.user existe
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado o token inválido'
+      });
+    }
+    
     const userId = req.user.id;
     
     // Verificar que el chat existe

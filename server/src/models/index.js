@@ -36,6 +36,18 @@ Job.belongsToMany(User, { through: 'JobLikes', as: 'likedBy', foreignKey: 'jobId
 User.belongsToMany(Job, { through: 'SavedJobs', as: 'savedJobs', foreignKey: 'userId' });
 Job.belongsToMany(User, { through: 'SavedJobs', as: 'savedBy', foreignKey: 'jobId' });
 
+// Chats - Users (Muchos usuarios pueden participar en muchos chats)
+User.belongsToMany(Chat, { through: 'ChatParticipants', as: 'chats', foreignKey: 'userId' });
+Chat.belongsToMany(User, { through: 'ChatParticipants', as: 'participants', foreignKey: 'ChatId' });
+
+// Chats - Messages (Un chat puede tener muchos mensajes)
+Chat.hasMany(Message, { foreignKey: 'chatId', as: 'messages', onDelete: 'CASCADE' });
+Message.belongsTo(Chat, { foreignKey: 'chatId', as: 'chat' });
+
+// Users - Messages (Un usuario puede enviar muchos mensajes)
+User.hasMany(Message, { foreignKey: 'userId', as: 'messages', onDelete: 'CASCADE' });
+Message.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 // NO ejecutamos sequelize.sync() aquí ya que lo haremos en el archivo principal (index.js)
 
 // Exportar los modelos
