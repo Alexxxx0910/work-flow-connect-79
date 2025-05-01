@@ -22,7 +22,9 @@ const Message = sequelize.define('Message', {
     references: {
       model: 'Chats',
       key: 'id'
-    }
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE'
   },
   userId: {
     type: DataTypes.UUID,
@@ -30,7 +32,9 @@ const Message = sequelize.define('Message', {
     references: {
       model: 'Users',
       key: 'id'
-    }
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE'
   }
 }, {
   timestamps: true,

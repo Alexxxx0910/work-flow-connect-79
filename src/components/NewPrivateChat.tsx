@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from '@/components/ui/use-toast';
-import axios from 'axios';
+import { apiRequest } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 interface User {
@@ -30,20 +30,27 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:5000/api/users/search', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        console.log("Solicitando lista de usuarios...");
         
-        // Filtrar para no incluir al usuario actual
-        if (currentUser) {
-          const filteredUsers = response.data.users.filter(
-            (user: User) => user.id !== currentUser.id
-          );
-          setUsers(filteredUsers);
+        const response = await apiRequest('/api/users/search');
+        
+        console.log("Respuesta de búsqueda de usuarios:", response);
+        
+        if (response && response.users) {
+          // Filtrar para no incluir al usuario actual
+          if (currentUser) {
+            const filteredUsers = response.users.filter(
+              (user: User) => user.id !== currentUser.id
+            );
+            setUsers(filteredUsers);
+            console.log("Usuarios cargados:", filteredUsers.length);
+          } else {
+            setUsers(response.users || []);
+            console.log("Usuarios cargados (sin filtrar):", response.users.length);
+          }
+          setError(null);
         } else {
-          setUsers(response.data.users || []);
+          throw new Error("Formato de respuesta inválido");
         }
       } catch (err) {
         console.error("Error al cargar usuarios:", err);
@@ -77,6 +84,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
     
     try {
       setCreatingChat(true);
+      console.log("Iniciando chat con usuario:", userId, userName);
       
       // Verificar si ya existe un chat con este usuario
       const existingChat = findExistingPrivateChat(userId);
@@ -93,14 +101,18 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       } else {
         // Crear nuevo chat privado con este usuario
         console.log("Creando nuevo chat con usuario:", userId, userName);
-        await createPrivateChat(userId, userName);
+        const newChat = await createPrivateChat(userId, userName);
         
-        toast({
-          title: "Chat con " + userName,
-          description: "Se ha iniciado un chat con " + userName
-        });
-        
-        onClose();
+        if (newChat) {
+          toast({
+            title: "Chat con " + userName,
+            description: "Se ha iniciado un chat con " + userName
+          });
+          
+          onClose();
+        } else {
+          throw new Error("No se pudo crear el chat");
+        }
       }
       
     } catch (error) {
