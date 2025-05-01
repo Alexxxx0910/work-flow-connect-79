@@ -101,18 +101,14 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       } else {
         // Crear nuevo chat privado con este usuario
         console.log("Creando nuevo chat con usuario:", userId, userName);
-        const newChat = await createPrivateChat(userId, userName);
+        await createPrivateChat(userId, userName);
         
-        if (newChat) {
-          toast({
-            title: "Chat con " + userName,
-            description: "Se ha iniciado un chat con " + userName
-          });
-          
-          onClose();
-        } else {
-          throw new Error("No se pudo crear el chat");
-        }
+        toast({
+          title: "Chat con " + userName,
+          description: "Se ha iniciado un chat con " + userName
+        });
+        
+        onClose();
       }
       
     } catch (error) {

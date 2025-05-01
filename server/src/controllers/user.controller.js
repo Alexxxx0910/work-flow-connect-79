@@ -158,6 +158,7 @@ exports.uploadProfilePhoto = async (req, res) => {
  */
 exports.searchUsers = async (req, res) => {
   try {
+    console.log("Buscando usuarios...");
     const { query, role } = req.query;
     const searchQuery = {
       attributes: { exclude: ['password'] },
@@ -181,6 +182,7 @@ exports.searchUsers = async (req, res) => {
     }
     
     const users = await User.findAll(searchQuery);
+    console.log(`Se encontraron ${users.length} usuarios`);
     
     return res.status(200).json({
       success: true,
