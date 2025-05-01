@@ -196,7 +196,8 @@ const Dashboard = () => {
                         <div className="flex items-center">
                           {/* Avatar del chat (primera letra del nombre) */}
                           <div className="h-10 w-10 rounded-full bg-wfc-purple/20 flex items-center justify-center text-wfc-purple font-semibold">
-                            {chat.isGroup ? chat.name.charAt(0) : currentUser?.id === chat.participants[0] ? 'U' : 'T'}
+                            {chat.isGroup ? chat.name.charAt(0) : 
+                              (currentUser && chat.participants[0] && currentUser.id === chat.participants[0].id) ? 'U' : 'T'}
                           </div>
                           <div className="ml-3">
                             <h3 className="font-medium">

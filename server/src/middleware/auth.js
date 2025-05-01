@@ -1,67 +1,56 @@
 
+// Si se necesita actualizar el middleware de autenticación para los chats
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
-/**
- * Middleware para verificar token JWT
- */
 exports.verifyToken = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    // Obtener el token del header
+    const token = req.headers['authorization']?.split(' ')[1];
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Acceso denegado. Token no proporcionado.'
+        message: 'No se proporcionó token de autenticación'
       });
     }
     
-    const token = authHeader.split(' ')[1];
+    // Verificar el token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      // Buscar usuario en la base de datos
-      const user = await User.findByPk(decoded.id);
-      
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Usuario no encontrado'
-        });
-      }
-      
-      // Añadir usuario al objeto request
-      req.user = user;
-      next();
-      
-    } catch (error) {
-      return res.status(401).json({
+    // Buscar el usuario en la base de datos
+    const user = await User.findByPk(decoded.id);
+    
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: 'Token inválido o expirado'
+        message: 'Usuario no encontrado'
       });
     }
     
+    // Guardar el usuario en el request para uso posterior
+    req.user = user;
+    next();
   } catch (error) {
-    console.error('Error en middleware de autenticación:', error);
+    console.error('Error de autenticación:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token inválido'
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expirado'
+      });
+    }
+    
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
     });
   }
 };
-
-/**
- * Middleware para verificar permisos de usuario
- */
-exports.isClient = (req, res, next) => {
-  if (req.user) {
-    return next();
-  }
-  
-  return res.status(403).json({
-    success: false,
-    message: 'Acceso denegado.'
-  });
-};
-

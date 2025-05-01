@@ -1,5 +1,5 @@
 
-const { Chat, User, Message, sequelize } = require('../models');
+const { Chat, User, Message, ChatParticipant, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 // Crear un nuevo chat
@@ -8,6 +8,12 @@ exports.createChat = async (req, res) => {
   
   try {
     const { participantIds, name = '', isGroup = false } = req.body;
+    
+    // Check if req.user exists, otherwise return error
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+    
     const currentUserId = req.user.id;
     
     if (!Array.isArray(participantIds) || participantIds.length < 1) {
@@ -145,6 +151,11 @@ exports.createChat = async (req, res) => {
 // Obtener todos los chats del usuario
 exports.getChats = async (req, res) => {
   try {
+    // Check if req.user exists, otherwise return error
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'No autenticado' });
+    }
+    
     const userId = req.user.id;
     
     // Usamos una consulta SQL directa para mejorar el rendimiento
