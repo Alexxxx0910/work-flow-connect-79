@@ -1,4 +1,3 @@
-
 const { Chat, User, Message, ChatParticipant, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
@@ -10,88 +9,100 @@ exports.createChat = async (req, res) => {
     const { participantIds, name = '', isGroup = false } = req.body;
     
     // Check if req.user exists, otherwise return error
-    if (!req.user) {
+    if (!req.user || !req.user.id) {
+      console.error("Error: Usuario no autenticado o sin ID", req.user);
+      await t.rollback();
       return res.status(401).json({ success: false, message: 'No autenticado' });
     }
     
     const currentUserId = req.user.id;
+    console.log("ID de usuario actual:", currentUserId);
     
     if (!Array.isArray(participantIds) || participantIds.length < 1) {
+      await t.rollback();
       return res.status(400).json({ success: false, message: 'Se requiere al menos un participante' });
     }
 
     // Asegurar que el usuario actual está incluido
-    if (!participantIds.includes(currentUserId)) {
-      participantIds.push(currentUserId);
+    let allParticipantIds = [...participantIds];
+    if (!allParticipantIds.includes(currentUserId)) {
+      allParticipantIds.push(currentUserId);
     }
+    console.log("Participantes del chat:", allParticipantIds);
 
     // Si es un chat privado, verificar si ya existe uno entre estos usuarios
-    if (!isGroup && participantIds.length === 2) {
-      // Usamos una consulta SQL directa para buscar un chat existente entre estos dos usuarios
-      const [existingChats] = await sequelize.query(`
-        SELECT c.id FROM "Chats" c
-        WHERE c."isGroup" = false
-        AND (
-          SELECT COUNT(*) FROM "ChatParticipants" cp
-          WHERE cp."chatId" = c.id
-        ) = 2
-        AND EXISTS (
-          SELECT 1 FROM "ChatParticipants" cp1
-          WHERE cp1."chatId" = c.id AND cp1."userId" = :userId1
-        )
-        AND EXISTS (
-          SELECT 1 FROM "ChatParticipants" cp2
-          WHERE cp2."chatId" = c.id AND cp2."userId" = :userId2
-        )
-      `, {
-        replacements: { 
-          userId1: participantIds[0],
-          userId2: participantIds[1]
-        },
-        type: sequelize.QueryTypes.SELECT,
-        transaction: t
-      });
-
-      if (existingChats.length > 0) {
-        const existingChatId = existingChats[0].id;
-        
-        // Si existe, obtener el chat completo
-        const existingChat = await Chat.findByPk(existingChatId, {
-          include: [
-            {
-              model: User,
-              as: 'participants',
-              attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen']
-            },
-            {
-              model: Message,
-              limit: 20,
-              order: [['createdAt', 'DESC']],
-              include: [
-                {
-                  model: User,
-                  as: 'user',
-                  attributes: ['id', 'name', 'photoURL']
-                }
-              ]
-            }
-          ],
+    if (!isGroup && allParticipantIds.length === 2) {
+      try {
+        const [existingChats] = await sequelize.query(`
+          SELECT c.id FROM "Chats" c
+          WHERE c."isGroup" = false
+          AND (
+            SELECT COUNT(*) FROM "ChatParticipants" cp
+            WHERE cp."chatId" = c.id
+          ) = 2
+          AND EXISTS (
+            SELECT 1 FROM "ChatParticipants" cp1
+            WHERE cp1."chatId" = c.id AND cp1."userId" = :userId1
+          )
+          AND EXISTS (
+            SELECT 1 FROM "ChatParticipants" cp2
+            WHERE cp2."chatId" = c.id AND cp2."userId" = :userId2
+          )
+        `, {
+          replacements: { 
+            userId1: allParticipantIds[0],
+            userId2: allParticipantIds[1]
+          },
+          type: sequelize.QueryTypes.SELECT,
           transaction: t
         });
         
-        await t.commit();
-        return res.status(200).json({ 
-          success: true, 
-          chat: existingChat,
-          message: 'Chat existente recuperado' 
-        });
+        if (existingChats && existingChats.length > 0) {
+          const existingChatId = existingChats[0].id;
+          
+          // Si existe, obtener el chat completo
+          const existingChat = await Chat.findByPk(existingChatId, {
+            include: [
+              {
+                model: User,
+                as: 'participants',
+                attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen']
+              },
+              {
+                model: Message,
+                as: 'messages',
+                limit: 20,
+                order: [['createdAt', 'DESC']],
+                include: [
+                  {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'photoURL']
+                  }
+                ]
+              }
+            ],
+            transaction: t
+          });
+          
+          await t.commit();
+          console.log("Chat existente recuperado:", existingChatId);
+          return res.status(200).json({ 
+            success: true, 
+            chat: existingChat,
+            message: 'Chat existente recuperado' 
+          });
+        }
+      } catch (error) {
+        console.error("Error al verificar chat existente:", error);
+        // Continuamos con la creación del chat
       }
     }
     
     // Determinar el nombre del chat para chats privados
     let chatName = name;
-    if (!isGroup && participantIds.length === 2) {
-      const otherUserId = participantIds.find(id => id !== currentUserId);
+    if (!isGroup && allParticipantIds.length === 2) {
+      const otherUserId = allParticipantIds.find(id => id !== currentUserId);
       if (otherUserId) {
         const otherUser = await User.findByPk(otherUserId, { 
           attributes: ['name'],
@@ -104,22 +115,22 @@ exports.createChat = async (req, res) => {
     }
     
     // Crear el nuevo chat
+    console.log("Creando nuevo chat:", { name: chatName, isGroup });
     const newChat = await Chat.create({
       name: chatName,
       isGroup,
       lastMessageAt: new Date()
     }, { transaction: t });
     
+    console.log("Chat creado con ID:", newChat.id);
+    
     // Añadir participantes
-    for (const userId of participantIds) {
-      await sequelize.query(`
-        INSERT INTO "ChatParticipants" ("id", "userId", "chatId", "createdAt", "updatedAt")
-        VALUES (uuid_generate_v4(), :userId, :chatId, NOW(), NOW())
-      `, {
-        replacements: { userId, chatId: newChat.id },
-        type: sequelize.QueryTypes.INSERT,
-        transaction: t
-      });
+    for (const userId of allParticipantIds) {
+      console.log(`Añadiendo participante ${userId} al chat ${newChat.id}`);
+      await ChatParticipant.create({
+        chatId: newChat.id,
+        userId: userId
+      }, { transaction: t });
     }
     
     // Cargar el chat completo con participantes
@@ -135,6 +146,7 @@ exports.createChat = async (req, res) => {
     });
     
     await t.commit();
+    console.log("Chat creado y cargado con éxito:", newChat.id);
     
     return res.status(201).json({ 
       success: true, 
@@ -152,62 +164,99 @@ exports.createChat = async (req, res) => {
 exports.getChats = async (req, res) => {
   try {
     // Check if req.user exists, otherwise return error
-    if (!req.user) {
+    if (!req.user || !req.user.id) {
+      console.error("Error: Usuario no autenticado o sin ID en getChats", req.user);
       return res.status(401).json({ success: false, message: 'No autenticado' });
     }
     
     const userId = req.user.id;
+    console.log("Obteniendo chats para usuario:", userId);
     
-    // Usamos una consulta SQL directa para mejorar el rendimiento
-    const [userChats] = await sequelize.query(`
-      SELECT c.*
-      FROM "Chats" AS c
-      JOIN "ChatParticipants" AS cp ON c.id = cp."chatId"
-      WHERE cp."userId" = :userId
-      ORDER BY c."lastMessageAt" DESC
-    `, {
-      replacements: { userId },
-      type: sequelize.QueryTypes.SELECT
+    // Obtener chats del usuario y sus participantes usando Sequelize directamente
+    const userChats = await Chat.findAll({
+      include: [
+        {
+          model: User,
+          as: 'participants',
+          attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen']
+        },
+        {
+          model: Message,
+          as: 'messages',
+          limit: 20,
+          order: [['createdAt', 'DESC']],
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'name', 'photoURL']
+            }
+          ]
+        }
+      ],
+      order: [['lastMessageAt', 'DESC']],
+      include: [
+        {
+          model: User,
+          as: 'participants',
+          attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen'],
+          through: {
+            attributes: []
+          }
+        },
+        {
+          model: Message,
+          as: 'messages',
+          separate: true,
+          limit: 20,
+          order: [['createdAt', 'DESC']],
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'name', 'photoURL']
+            }
+          ]
+        }
+      ]
     });
     
-    // Para cada chat, obtenemos los participantes y los últimos mensajes
-    const chatsWithDetails = await Promise.all(userChats.map(async (chat) => {
-      // Obtener participantes
-      const [participants] = await sequelize.query(`
-        SELECT u.id, u.name, u."photoURL", u."isOnline", u."lastSeen"
-        FROM "Users" AS u
-        JOIN "ChatParticipants" AS cp ON u.id = cp."userId"
-        WHERE cp."chatId" = :chatId
-      `, {
-        replacements: { chatId: chat.id },
-        type: sequelize.QueryTypes.SELECT
-      });
+    console.log(`Se encontraron ${userChats.length} chats para el usuario ${userId}`);
+    
+    // Procesar los chats para el formato adecuado
+    const chatsWithDetails = userChats.map(chat => {
+      const messages = chat.messages || [];
+      const sortedMessages = [...messages].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
       
-      // Obtener últimos mensajes
-      const [messages] = await sequelize.query(`
-        SELECT m.id, m.content, m."userId" as "senderId", m.read, m."createdAt" as timestamp,
-               u.id as "user.id", u.name as "user.name", u."photoURL" as "user.photoURL"
-        FROM "Messages" AS m
-        LEFT JOIN "Users" AS u ON m."userId" = u.id
-        WHERE m."chatId" = :chatId
-        ORDER BY m."createdAt" DESC
-        LIMIT 20
-      `, {
-        replacements: { chatId: chat.id },
-        type: sequelize.QueryTypes.SELECT,
-        nest: true
-      });
-      
-      // Obtener último mensaje
-      const lastMessage = messages.length > 0 ? messages[0] : null;
+      // Obtener el último mensaje
+      const lastMessage = sortedMessages.length > 0 ? sortedMessages[0] : null;
       
       return {
-        ...chat,
-        participants,
-        messages: messages.reverse(),
-        lastMessage
+        id: chat.id,
+        name: chat.name,
+        isGroup: chat.isGroup,
+        lastMessageAt: chat.lastMessageAt,
+        participants: chat.participants,
+        messages: sortedMessages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          senderId: msg.userId,
+          read: msg.read,
+          timestamp: msg.createdAt,
+          user: msg.user
+        })),
+        lastMessage: lastMessage ? {
+          id: lastMessage.id,
+          content: lastMessage.content,
+          senderId: lastMessage.userId,
+          read: lastMessage.read,
+          timestamp: lastMessage.createdAt,
+          user: lastMessage.user
+        } : null
       };
-    }));
+    });
     
     return res.status(200).json({ success: true, chats: chatsWithDetails });
   } catch (error) {

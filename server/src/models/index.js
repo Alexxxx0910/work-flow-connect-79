@@ -31,14 +31,13 @@ User.belongsToMany(Job, { through: 'JobLikes', as: 'likedJobs' });
 
 // Usuarios que han guardado trabajos (relación muchos a muchos)
 Job.belongsToMany(User, { through: 'SavedJobs', as: 'savedBy' });
-User.belongsToMany(Job, { through: 'SavedJobs', as: 'savedJobs' });
+User.belongsToMany(User, { through: 'SavedJobs', as: 'savedJobs' });
 
 // Relaciones de chat
-// Chat y usuarios (relación muchos a muchos)
 Chat.belongsToMany(User, { 
   through: ChatParticipant,
   foreignKey: 'chatId',
-  otherKey: 'userId',
+  otherKey: 'userId', 
   as: 'participants' 
 });
 

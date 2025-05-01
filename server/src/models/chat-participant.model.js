@@ -8,15 +8,21 @@ const ChatParticipant = sequelize.define('ChatParticipant', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
-  userId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    field: 'userId'  // Explicitly define the field name
-  },
   chatId: {
     type: DataTypes.UUID,
     allowNull: false,
-    field: 'chatId'  // Explicitly define the field name
+    references: {
+      model: 'Chats',
+      key: 'id'
+    }
+  },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   }
 }, {
   timestamps: true,

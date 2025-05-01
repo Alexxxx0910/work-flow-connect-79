@@ -15,9 +15,26 @@ const Message = sequelize.define('Message', {
   read: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
+  },
+  chatId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Chats',
+      key: 'id'
+    }
+  },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  tableName: 'Messages'
 });
 
 module.exports = Message;
