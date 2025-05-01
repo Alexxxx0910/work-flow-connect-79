@@ -10,24 +10,28 @@ const { sequelize } = require('../config/database');
 
 // Definir relaciones entre modelos
 // Relaciones de trabajo
-Job.belongsTo(User, { foreignKey: 'userId' });
-User.hasMany(Job, { foreignKey: 'userId' });
+Job.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasMany(Job, { foreignKey: 'userId', as: 'jobs' });
 
 // Relaciones de comentarios
-Comment.belongsTo(User, { foreignKey: 'userId' });
-Comment.belongsTo(Job, { foreignKey: 'jobId' });
-User.hasMany(Comment, { foreignKey: 'userId' });
-Job.hasMany(Comment, { foreignKey: 'jobId' });
+Comment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Comment.belongsTo(Job, { foreignKey: 'jobId', as: 'job' });
+User.hasMany(Comment, { foreignKey: 'userId', as: 'comments' });
+Job.hasMany(Comment, { foreignKey: 'jobId', as: 'comments' });
 
 // Relaciones de respuestas
-Reply.belongsTo(User, { foreignKey: 'userId' });
-Reply.belongsTo(Comment, { foreignKey: 'commentId' });
-User.hasMany(Reply, { foreignKey: 'userId' });
-Comment.hasMany(Reply, { foreignKey: 'commentId' });
+Reply.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Reply.belongsTo(Comment, { foreignKey: 'commentId', as: 'comment' });
+User.hasMany(Reply, { foreignKey: 'userId', as: 'replies' });
+Comment.hasMany(Reply, { foreignKey: 'commentId', as: 'replies' });
 
 // Usuarios que han dado like a trabajos (relación muchos a muchos)
 Job.belongsToMany(User, { through: 'JobLikes', as: 'likedBy' });
 User.belongsToMany(Job, { through: 'JobLikes', as: 'likedJobs' });
+
+// Usuarios que han guardado trabajos (relación muchos a muchos)
+Job.belongsToMany(User, { through: 'SavedJobs', as: 'savedBy' });
+User.belongsToMany(Job, { through: 'SavedJobs', as: 'savedJobs' });
 
 // Relaciones de chat
 // Chat y usuarios (relación muchos a muchos)
@@ -46,11 +50,11 @@ User.belongsToMany(Chat, {
 });
 
 // Chat y mensajes
-Chat.hasMany(Message, { foreignKey: 'chatId' });
-Message.belongsTo(Chat, { foreignKey: 'chatId' });
+Chat.hasMany(Message, { foreignKey: 'chatId', as: 'messages' });
+Message.belongsTo(Chat, { foreignKey: 'chatId', as: 'chat' });
 
 // Usuario y mensajes
-User.hasMany(Message, { foreignKey: 'userId' });
+User.hasMany(Message, { foreignKey: 'userId', as: 'messages' });
 Message.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 module.exports = {

@@ -1,5 +1,4 @@
-
-const { User, Chat, Message } = require('../models');
+const { User, Chat, Message, ChatParticipant, sequelize } = require('../models');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 
@@ -67,22 +66,16 @@ const initSocket = (io) => {
       
       // Unirse a las salas de chat del usuario
       try {
-        // Utilizamos una consulta SQL directa para obtener los chats del usuario
-        const [userChats] = await sequelize.query(`
-          SELECT c.*
-          FROM "Chats" AS c
-          JOIN "ChatParticipants" AS cp ON c.id = cp."chatId"
-          WHERE cp."userId" = :userId
-        `, {
-          replacements: { userId: user.id },
-          type: sequelize.QueryTypes.SELECT
+        // Buscar los chats del usuario utilizando el modelo ChatParticipant
+        const chatParticipants = await ChatParticipant.findAll({
+          where: { userId: user.id }
         });
         
-        if (userChats && userChats.length > 0) {
-          userChats.forEach(chat => {
-            socket.join(`chat:${chat.id}`);
-            console.log(`Usuario ${user.name} unido a la sala chat:${chat.id}`);
-          });
+        if (chatParticipants && chatParticipants.length > 0) {
+          for (const participant of chatParticipants) {
+            socket.join(`chat:${participant.chatId}`);
+            console.log(`Usuario ${user.name} unido a la sala chat:${participant.chatId}`);
+          }
         } else {
           console.log(`No se encontraron chats para el usuario ${user.name}`);
         }
@@ -102,13 +95,9 @@ const initSocket = (io) => {
             return;
           }
           
-          // Verificar que el usuario es participante usando una consulta directa
-          const [isParticipant] = await sequelize.query(`
-            SELECT 1 FROM "ChatParticipants" 
-            WHERE "chatId" = :chatId AND "userId" = :userId
-          `, {
-            replacements: { chatId, userId: user.id },
-            type: sequelize.QueryTypes.SELECT
+          // Verificar que el usuario es participante
+          const isParticipant = await ChatParticipant.findOne({
+            where: { chatId, userId: user.id }
           });
           
           if (!isParticipant) {

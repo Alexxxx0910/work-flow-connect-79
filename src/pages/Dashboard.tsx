@@ -1,194 +1,227 @@
 
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
+/**
+ * Componente Dashboard
+ * 
+ * Esta es la página principal que se muestra a los usuarios después de iniciar sesión.
+ * Muestra un resumen del sistema con estadísticas, propuestas recientes y mensajes recientes.
+ */
+
 import MainLayout from '@/components/Layout/MainLayout';
-import { ChatType, useChat, ChatParticipant } from '@/contexts/ChatContext';
-import { NewPrivateChat } from '@/components/NewPrivateChat';
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Send, Loader2, Plus, CheckCheck } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { useJobs } from '@/contexts/JobContext';
+import { useChat } from '@/contexts/ChatContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Briefcase, MessageCircle, Timer, ArrowRight } from 'lucide-react';
 
 const Dashboard = () => {
-  const { currentUser, loading: authLoading } = useAuth();
-  const { chats, activeChat, setActiveChat, sendMessage, loadingChats, onlineUsers } = useChat();
-  const navigate = useNavigate();
-  const [messageContent, setMessageContent] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  // Obtener datos del usuario autenticado
+  const { currentUser } = useAuth();
+  
+  // Obtener listado de propuestas y estado de carga
+  const { jobs, loading: loadingJobs } = useJobs();
+  
+  // Obtener listado de chats y estado de carga
+  const { chats, loadingChats } = useChat();
 
-  useEffect(() => {
-    if (!currentUser && !authLoading) {
-      navigate('/login');
-    }
-  }, [currentUser, authLoading, navigate]);
+  // Filtrar las 3 propuestas más recientes
+  const recentJobs = [...jobs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 3);
 
-  if (authLoading) {
-    return <div>Cargando...</div>;
-  }
+  // Filtrar los 3 chats con mensajes más recientes
+  const recentChats = [...chats]
+    .filter(chat => chat.lastMessage) // Solo chats con mensajes
+    .sort((a, b) => {
+      const timestampA = a.lastMessage?.timestamp || 0;
+      const timestampB = b.lastMessage?.timestamp || 0;
+      return timestampB - timestampA; // Ordenar de más reciente a más antiguo
+    })
+    .slice(0, 3); // Tomar solo los 3 primeros
 
-  if (!currentUser) {
-    return null;
-  }
-
-  const handleSendMessage = async () => {
-    if (!activeChat || isSending) return;
-
-    setIsSending(true);
-    try {
-      await sendMessage(activeChat.id, messageContent);
-      setMessageContent('');
-    } catch (error) {
-      console.error("Error al enviar el mensaje:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo enviar el mensaje. Por favor, inténtalo de nuevo."
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const renderChatList = () => {
-    if (loadingChats) {
-      return (
-        <div className="flex flex-col space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col gap-2">
-        {chats.map((chat) => (
-          <div
-            key={chat.id}
-            className={`flex items-center space-x-4 p-3 rounded-md hover:bg-secondary cursor-pointer ${activeChat?.id === chat.id ? 'bg-secondary' : ''}`}
-            onClick={() => setActiveChat(chat)}
-          >
-            <Avatar>
-              <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
-              <AvatarFallback>CN</AvatarFallback>
-            </Avatar>
-            <div className="space-y-1">
-              <p className="text-sm font-medium leading-none">{chat.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {chat.lastMessage?.content || 'No messages yet'}
-              </p>
-            </div>
-            <Separator orientation="vertical" className="h-10" />
-            {chat.lastMessageAt && (
-              <div className="text-xs text-muted-foreground">
-                {format(new Date(chat.lastMessageAt), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderContent = () => {
-    if (!activeChat) {
-      return <div className="h-full flex items-center justify-center text-muted-foreground">Selecciona un chat para ver los mensajes</div>;
-    }
-
-    const isOnline = activeChat.participants.some(p => p.id !== currentUser?.id && onlineUsers.includes(p.id));
-    const otherParticipant = activeChat.participants.find(p => p.id !== currentUser?.id);
-
-    return (
-      <div className="flex flex-col h-full">
-        <div className="border-b p-4">
-          <div className="font-bold text-lg">{activeChat.name}</div>
-          <div className="text-sm text-muted-foreground">
-            {isOnline ? <Badge variant="secondary">Online</Badge> : 'Offline'}
-            {otherParticipant && !isOnline && (
-              <span>
-                Visto por última vez: {otherParticipant.lastSeen ? format(new Date(otherParticipant.lastSeen), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : 'Desconocido'}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex-1 p-4 overflow-y-auto">
-          {activeChat.messages.map((message) => (
-            <div key={message.id} className={`mb-2 flex flex-col ${message.senderId === currentUser.id ? 'items-end' : 'items-start'}`}>
-              <div className={`rounded-lg p-2 ${message.senderId === currentUser.id ? 'bg-blue-100 dark:bg-blue-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                {message.content}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {format(new Date(message.timestamp), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                {message.read && message.senderId === currentUser.id && (
-                  <CheckCheck className="inline-block w-4 h-4 ml-1" />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="p-4 border-t">
-          <div className="flex items-center space-x-2">
-            <Textarea
-              placeholder="Escribe tu mensaje..."
-              value={messageContent}
-              onChange={(e) => setMessageContent(e.target.value)}
-              className="flex-1 resize-none"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-            />
-            <Button onClick={handleSendMessage} disabled={isSending}>
-              {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Enviar
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+  /**
+   * Función para formatear fechas en formato día/mes/año
+   */
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric'
+    });
   };
 
   return (
     <MainLayout>
-      <div className="grid md:grid-cols-4 grid-cols-1 gap-4">
-        <div className="md:col-span-1">
-          <div className="p-4">
-            <div className="font-bold text-lg mb-4">Chats</div>
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button><Plus className="mr-2 h-4 w-4" /> Nuevo Chat</Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-full sm:w-[400px]">
-                <SheetHeader>
-                  <SheetTitle>Nuevo Chat</SheetTitle>
-                  <SheetDescription>
-                    Selecciona un contacto para iniciar un chat.
-                  </SheetDescription>
-                </SheetHeader>
-                <NewPrivateChat onClose={() => setIsSheetOpen(false)} />
-                <SheetFooter>
-                  <SheetClose asChild>
-                    <Button type="button" variant="secondary">Cancelar</Button>
-                  </SheetClose>
-                </SheetFooter>
-              </SheetContent>
-            </Sheet>
-            <div className="mt-4">{renderChatList()}</div>
-          </div>
+      <div className="space-y-8">
+        {/* Sección de bienvenida */}
+        <div className="pb-4 border-b border-gray-200">
+          <h1 className="text-2xl sm:text-3xl font-bold">¡Bienvenido, {currentUser?.name}!</h1>
+          <p className="text-gray-600 mt-2">Esto es lo que está pasando en WorkFlowConnect hoy.</p>
         </div>
-        <div className="md:col-span-3">{renderContent()}</div>
+        
+        {/* Sección de estadísticas - Muestra 3 tarjetas con resúmenes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Tarjeta de propuestas activas */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Propuestas</CardTitle>
+              <CardDescription>Propuestas activas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Briefcase className="h-8 w-8 text-wfc-purple" />
+                <span className="text-2xl font-bold ml-2">
+                  {loadingJobs ? '...' : jobs.filter(j => j.status === 'open').length}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Tarjeta de chats activos */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Mensajes</CardTitle>
+              <CardDescription>Chats activos</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <MessageCircle className="h-8 w-8 text-wfc-purple" />
+                <span className="text-2xl font-bold ml-2">
+                  {loadingChats ? '...' : chats.length}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Tarjeta de actividad reciente */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Actividad</CardTitle>
+              <CardDescription>Última conexión</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center">
+                <Timer className="h-8 w-8 text-wfc-purple" />
+                <span className="text-2xl font-bold ml-2">Hoy</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Sección de propuestas recientes */}
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Propuestas recientes</h2>
+            <Link to="/jobs">
+              <Button variant="ghost" className="text-wfc-purple">
+                Ver todas <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          
+          {/* Mostrar estado de carga, mensaje si no hay propuestas, o lista de propuestas */}
+          {loadingJobs ? (
+            <div className="text-center py-8">Cargando propuestas...</div>
+          ) : recentJobs.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">No hay propuestas disponibles</p>
+              <Link to="/create-job">
+                <Button className="mt-4 bg-wfc-purple hover:bg-wfc-purple-medium">
+                  Crear propuesta
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {/* Mapear cada propuesta reciente a una tarjeta */}
+              {recentJobs.map((job) => (
+                <Link key={job.id} to={`/jobs/${job.id}`}>
+                  <Card className="hover:border-wfc-purple transition-colors">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg font-medium">{job.title}</CardTitle>
+                          <CardDescription className="text-sm">
+                            Publicado por {job.userName} • {formatDate(job.timestamp)}
+                          </CardDescription>
+                        </div>
+                        <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                          {job.status === 'open' ? 'Abierto' : job.status === 'in-progress' ? 'En progreso' : 'Completado'}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-700 text-sm line-clamp-2">{job.description}</p>
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {job.skills.slice(0, 3).map((skill, index) => (
+                          <span key={index} className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Sección de mensajes recientes */}
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Mensajes recientes</h2>
+            <Link to="/chats">
+              <Button variant="ghost" className="text-wfc-purple">
+                Ver todos <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+          
+          {/* Mostrar estado de carga, mensaje si no hay chats, o lista de chats */}
+          {loadingChats ? (
+            <div className="text-center py-8">Cargando mensajes...</div>
+          ) : recentChats.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-gray-500">No hay mensajes recientes</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {/* Mapear cada chat reciente a una tarjeta */}
+              {recentChats.map((chat) => (
+                <Link key={chat.id} to="/chats">
+                  <Card className="hover:border-wfc-purple transition-colors">
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {/* Avatar del chat (primera letra del nombre) */}
+                          <div className="h-10 w-10 rounded-full bg-wfc-purple/20 flex items-center justify-center text-wfc-purple font-semibold">
+                            {chat.isGroup ? chat.name.charAt(0) : currentUser?.id === chat.participants[0] ? 'U' : 'T'}
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="font-medium">
+                              {chat.isGroup ? chat.name : 'Chat privado'}
+                            </h3>
+                            <p className="text-sm text-gray-600 line-clamp-1">
+                              {chat.lastMessage?.content}
+                            </p>
+                          </div>
+                        </div>
+                        {/* Hora del último mensaje */}
+                        <span className="text-xs text-gray-500">
+                          {chat.lastMessage ? new Date(chat.lastMessage.timestamp).toLocaleTimeString('es-ES', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : ''}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </MainLayout>
   );
