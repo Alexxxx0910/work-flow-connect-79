@@ -4,7 +4,7 @@ import MainLayout from '@/components/Layout/MainLayout';
 import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -14,7 +14,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Send, 
-  Plus, 
   UserPlus, 
   Users, 
   Search, 
@@ -24,6 +23,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { ChatGroupForm } from '@/components/ChatGroupForm';
+import { NewPrivateChat } from '@/components/NewPrivateChat';
 import { UserSelectDialog } from '@/components/UserSelectDialog';
 import { toast } from '@/components/ui/use-toast';
 
@@ -152,6 +152,11 @@ const ChatsPage = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
   
+  // Función para obtener el timestamp de un mensaje, considerando tanto timestamp como createdAt
+  const getMessageTimestamp = (message: any) => {
+    return message.timestamp || message.createdAt || Date.now();
+  };
+  
   return (
     <MainLayout>
       <div className="h-[calc(100vh-8rem)] flex">
@@ -275,7 +280,7 @@ const ChatsPage = () => {
                             <h3 className="font-medium leading-tight truncate">{getChatName(chat)}</h3>
                             {chat.lastMessage && (
                               <span className="text-xs text-gray-400">
-                                {formatTime(chat.lastMessage.timestamp || chat.lastMessage.createdAt)}
+                                {formatTime(getMessageTimestamp(chat.lastMessage))}
                               </span>
                             )}
                           </div>
@@ -383,17 +388,19 @@ const ChatsPage = () => {
                         const isCurrentUser = currentUser && message.senderId === currentUser.id;
                         const isSystemMessage = message.senderId === "system";
                         const sender = isSystemMessage ? null : getUserById(message.senderId);
+                        const messageTimestamp = getMessageTimestamp(message);
+                        const prevMessageTimestamp = index > 0 ? getMessageTimestamp(messages[index - 1]) : null;
                         
                         const showDateSeparator = index === 0 || 
-                          new Date(message.timestamp || message.createdAt).toDateString() !== 
-                          new Date(messages[index - 1].timestamp || messages[index - 1].createdAt).toDateString();
+                          new Date(messageTimestamp).toDateString() !== 
+                          new Date(prevMessageTimestamp).toDateString();
                         
                         return (
                           <React.Fragment key={message.id}>
                             {showDateSeparator && (
                               <div className="flex justify-center my-4">
                                 <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full text-xs text-gray-500">
-                                  {formatDate(message.timestamp || message.createdAt)}
+                                  {formatDate(messageTimestamp)}
                                 </div>
                               </div>
                             )}
@@ -430,7 +437,7 @@ const ChatsPage = () => {
                                     <p className="break-words">{message.content}</p>
                                   </div>
                                   <p className="text-xs text-gray-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {formatTime(message.timestamp || message.createdAt)}
+                                    {formatTime(messageTimestamp)}
                                   </p>
                                 </div>
                               </div>
@@ -515,12 +522,14 @@ const ChatsPage = () => {
         </DialogContent>
       </Dialog>
       
-      <UserSelectDialog 
-        open={isSelectingUser} 
-        onOpenChange={setIsSelectingUser}
-        title="Nuevo chat privado"
-        onUserSelect={handleCreatePrivateChat}
-      />
+      <Dialog open={isSelectingUser} onOpenChange={setIsSelectingUser}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo chat privado</DialogTitle>
+          </DialogHeader>
+          <NewPrivateChat onClose={() => setIsSelectingUser(false)} />
+        </DialogContent>
+      </Dialog>
       
       {activeChat && (
         <UserSelectDialog 

@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from '@/components/ui/use-toast';
 import { apiRequest } from '@/lib/api';
-import { Loader2, Search, UserPlus } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 
 interface User {
   id: string;
@@ -108,8 +108,6 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div className="p-4 space-y-4">
-      <h3 className="font-medium text-lg">Nuevo chat privado</h3>
-      
       <div className="relative">
         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
         <Input

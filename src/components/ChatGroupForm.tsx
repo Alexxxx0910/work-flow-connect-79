@@ -1,28 +1,60 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useChat } from '@/contexts/ChatContext';
-import { useData, UserType } from '@/contexts/DataContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Check, X } from 'lucide-react';
+import { Check, X, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { apiRequest } from '@/lib/api';
+
+interface User {
+  id: string;
+  name: string;
+  photoURL: string;
+  role: string;
+}
 
 export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
   const { createChat } = useChat();
-  const { getAllUsers } = useData();
   const [groupName, setGroupName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<UserType[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  const allUsers = getAllUsers();
+  // Cargar usuarios desde la API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await apiRequest('/api/users/search');
+        
+        if (response && response.success && response.users) {
+          setAllUsers(response.users);
+          setError(null);
+        } else {
+          throw new Error("Error al cargar usuarios");
+        }
+      } catch (err) {
+        console.error("Error al cargar usuarios:", err);
+        setError("No se pudieron cargar los usuarios");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
   
   const filteredUsers = allUsers.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
     !selectedUsers.some(selected => selected.id === user.id)
   );
 
-  const handleSelectUser = (user: UserType) => {
+  const handleSelectUser = (user: User) => {
     setSelectedUsers(prev => [...prev, user]);
     setSearchTerm('');
   };
@@ -107,7 +139,14 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
         />
       </div>
       
-      {searchTerm && (
+      {loading ? (
+        <div className="flex justify-center items-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-wfc-purple" />
+          <span className="ml-2">Cargando usuarios...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center py-4 text-red-500">{error}</div>
+      ) : searchTerm && (
         <div className="border rounded-md max-h-40 overflow-y-auto">
           {filteredUsers.length === 0 ? (
             <p className="text-sm text-gray-500 p-2">No se encontraron usuarios</p>

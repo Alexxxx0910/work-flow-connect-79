@@ -1,3 +1,4 @@
+
 const { User, Job } = require('../models');
 const fs = require('fs').promises;
 const path = require('path');
@@ -157,9 +158,10 @@ exports.uploadProfilePhoto = async (req, res) => {
  */
 exports.searchUsers = async (req, res) => {
   try {
-    console.log("Buscando usuarios...");
     const { query, role } = req.query;
     const currentUser = req.user;
+    
+    console.log("Buscando usuarios, usuario actual:", currentUser?.id);
     
     // Asegurar que el usuario actual esté autenticado
     if (!currentUser || !currentUser.id) {

@@ -8,75 +8,8 @@
 
 import { ChatType, MessageType, ChatParticipant } from "@/contexts/ChatContext";
 
-// Mock de usuarios para mostrar nombres en los chats
-const MOCK_USERS: Record<string, {name: string, photoURL: string, role: string}> = {
-  "user1": { name: "Juan Pérez", photoURL: "", role: "freelancer" },
-  "user2": { name: "Ana López", photoURL: "", role: "client" },
-  "user3": { name: "Empresa ABC", photoURL: "", role: "client" },
-};
-
 // Estado local para los chats (simula una base de datos)
-let CHATS: ChatType[] = [
-  {
-    id: "chat1",
-    name: "Juan Pérez",  // Nombre del usuario con el que se chatea
-    participants: [
-      { id: "user1", name: "Juan Pérez", photoURL: "", isOnline: true },
-      { id: "user3", name: "Empresa ABC", photoURL: "", isOnline: false }
-    ],
-    messages: [
-      {
-        id: "msg1",
-        senderId: "user3",
-        content: "Hola, me interesa tu perfil para un proyecto",
-        timestamp: Date.now() - 86400000 // 1 día atrás
-      },
-      {
-        id: "msg2",
-        senderId: "user1",
-        content: "Hola, gracias por contactarme. Cuéntame más sobre el proyecto.",
-        timestamp: Date.now() - 86400000 + 3600000 // 1 día atrás + 1 hora
-      }
-    ],
-    isGroup: false,
-    lastMessage: {
-      id: "msg2",
-      senderId: "user1",
-      content: "Hola, gracias por contactarme. Cuéntame más sobre el proyecto.",
-      timestamp: Date.now() - 86400000 + 3600000
-    }
-  },
-  {
-    id: "chat2",
-    name: "Proyecto Web App",
-    participants: [
-      { id: "user1", name: "Juan Pérez", photoURL: "", isOnline: true },
-      { id: "user2", name: "Ana López", photoURL: "", isOnline: false },
-      { id: "user3", name: "Empresa ABC", photoURL: "", isOnline: true }
-    ],
-    messages: [
-      {
-        id: "msg3",
-        senderId: "user3",
-        content: "He creado este grupo para coordinar el nuevo proyecto",
-        timestamp: Date.now() - 172800000 // 2 días atrás
-      },
-      {
-        id: "msg4",
-        senderId: "user2",
-        content: "Perfecto, ¿cuándo comenzamos?",
-        timestamp: Date.now() - 172800000 + 3600000 // 2 días atrás + 1 hora
-      }
-    ],
-    isGroup: true,
-    lastMessage: {
-      id: "msg4",
-      senderId: "user2",
-      content: "Perfecto, ¿cuándo comenzamos?",
-      timestamp: Date.now() - 172800000 + 3600000
-    }
-  }
-];
+let CHATS: ChatType[] = [];
 
 // Mapa de callbacks para simular listeners en tiempo real
 const listeners: ((chats: ChatType[]) => void)[] = [];
@@ -84,17 +17,6 @@ const listeners: ((chats: ChatType[]) => void)[] = [];
 // Función para notificar a los listeners cuando hay cambios
 const notifyListeners = () => {
   listeners.forEach(callback => callback([...CHATS]));
-};
-
-// Función auxiliar para obtener información de usuario (nombre, foto, etc.)
-const getUserInfo = (userId: string): ChatParticipant => {
-  const userInfo = MOCK_USERS[userId] || { name: "Usuario", photoURL: "", role: "usuario" };
-  return {
-    id: userId,
-    name: userInfo.name,
-    photoURL: userInfo.photoURL,
-    isOnline: Math.random() > 0.5 // Simular estado online aleatorio
-  };
 };
 
 /**
@@ -127,24 +49,10 @@ export const createChat = async (participantIds: string[], name = ""): Promise<C
     }
   }
   
-  // Convertir IDs de participantes a objetos de participante
-  const participants = participantIds.map(id => getUserInfo(id));
-  
-  // Para chats privados, usar el nombre del otro participante como nombre del chat
-  let chatName = name;
-  if (!isGroup && participantIds.length === 2) {
-    // Encontrar el participante que no es el creador del chat (asumimos que el primer ID es el creador)
-    const otherParticipantId = participantIds[1];
-    const otherParticipant = participants.find(p => p.id === otherParticipantId);
-    if (otherParticipant) {
-      chatName = otherParticipant.name;
-    }
-  }
-  
   const newChat: ChatType = {
     id: `chat${Date.now()}`,
-    name: chatName,
-    participants,
+    name: name,
+    participants: participantIds.map(id => ({ id, name: '', photoURL: '' })),
     messages: [],
     isGroup
   };
@@ -199,8 +107,7 @@ export const addParticipantToChat = async (chatId: string, participantId: string
     return false;
   }
   
-  const newParticipant = getUserInfo(participantId);
-  CHATS[chatIndex].participants = [...CHATS[chatIndex].participants, newParticipant];
+  CHATS[chatIndex].participants = [...CHATS[chatIndex].participants, { id: participantId, name: '', photoURL: '' }];
   
   // Añadir un mensaje del sistema
   const systemMessage: MessageType = {
