@@ -1,4 +1,3 @@
-
 const { User, Job } = require('../models');
 const fs = require('fs').promises;
 const path = require('path');
@@ -160,6 +159,17 @@ exports.searchUsers = async (req, res) => {
   try {
     console.log("Buscando usuarios...");
     const { query, role } = req.query;
+    const currentUser = req.user;
+    
+    // Asegurar que el usuario actual esté autenticado
+    if (!currentUser || !currentUser.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no autenticado'
+      });
+    }
+    
+    // Configurar la búsqueda de usuarios
     const searchQuery = {
       attributes: { exclude: ['password'] },
       where: {}
@@ -181,8 +191,16 @@ exports.searchUsers = async (req, res) => {
       searchQuery.where.role = role;
     }
     
+    // Excluir al usuario actual de los resultados
+    const { Op } = require('sequelize');
+    searchQuery.where = {
+      ...searchQuery.where,
+      id: { [Op.ne]: currentUser.id }
+    };
+    
+    // Realizar la búsqueda
     const users = await User.findAll(searchQuery);
-    console.log(`Se encontraron ${users.length} usuarios`);
+    console.log(`Se encontraron ${users.length} usuarios (excluyendo al usuario actual ${currentUser.id})`);
     
     return res.status(200).json({
       success: true,
