@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
+const { validateProfileUpdate } = require('../middleware/userValidation');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -43,7 +44,7 @@ const upload = multer({
 router.get('/me', userController.getCurrentUser);
 router.get('/search', userController.searchUsers);
 router.get('/:userId', userController.getUserById);
-router.put('/profile', userController.updateProfile);
+router.put('/profile', validateProfileUpdate, userController.updateProfile);
 router.post('/profile/photo', upload.single('photo'), userController.uploadProfilePhoto);
 
 module.exports = router;
