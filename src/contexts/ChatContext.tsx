@@ -1,3 +1,4 @@
+
 /**
  * Contexto de Chat
  * 
@@ -259,8 +260,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     try {
       console.log("Cargando chats para el usuario:", currentUser.id);
       
-      // Cargar chats desde la API
-      const response = await apiRequest('/api/chats');
+      // Corregir la ruta eliminando el "/api" duplicado
+      const response = await apiRequest('/chats');
       if (response && response.chats) {
         // Procesar los chats recibidos para asegurar el formato correcto
         const processedChats = response.chats.map((chat: any) => ({
@@ -369,7 +370,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       
       console.log("Socket no disponible, usando API REST");
       // Si no hay socket o no está conectado, usar REST API
-      const response = await apiRequest(`/api/chats/${chatId}/messages`, 'POST', { content });
+      // Corregir la ruta eliminando el "/api" duplicado
+      const response = await apiRequest(`/chats/${chatId}/messages`, 'POST', { content });
       console.log("Respuesta de envío de mensaje mediante API REST:", response);
       
       if (response && response.chatMessage) {
@@ -434,7 +436,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     
     try {
       // Crear chat a través de la API
-      const response = await apiRequest('/api/chats', 'POST', { 
+      // Corregir la ruta eliminando el "/api" duplicado
+      const response = await apiRequest('/chats', 'POST', { 
         participantIds, 
         name, 
         isGroup: participantIds.length > 2 || !!name 
@@ -522,7 +525,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       if (chat.participants.some(p => p.id === participantId)) return false;
       
       // Añadir participante mediante API
-      const response = await apiRequest(`/api/chats/${chatId}/participants`, 'POST', {
+      // Corregir la ruta eliminando el "/api" duplicado
+      const response = await apiRequest(`/chats/${chatId}/participants`, 'POST', {
         userId: participantId
       });
       

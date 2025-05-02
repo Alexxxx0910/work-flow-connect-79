@@ -38,7 +38,8 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
       setLoading(true);
       console.log("Solicitando lista de usuarios...");
       
-      const response = await apiRequest('/api/users/search');
+      // Corregir la ruta eliminando el "/api" duplicado
+      const response = await apiRequest('/users/search');
       
       console.log("Respuesta de búsqueda de usuarios:", response);
       

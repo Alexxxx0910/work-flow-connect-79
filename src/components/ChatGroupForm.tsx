@@ -29,7 +29,8 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await apiRequest('/api/users/search');
+      // Corregir la ruta eliminando el "/api" duplicado
+      const response = await apiRequest('/users/search');
       
       console.log("Respuesta de búsqueda de usuarios para grupo:", response);
       

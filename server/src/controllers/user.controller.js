@@ -2,12 +2,14 @@
 const { User, Job } = require('../models');
 const fs = require('fs').promises;
 const path = require('path');
+const { Op } = require('sequelize');
 
 /**
  * Obtener información del usuario actual
  */
 exports.getCurrentUser = async (req, res) => {
   try {
+    console.log('Obteniendo usuario actual:', req.user?.id);
     // El usuario ya está en req.user gracias al middleware de autenticación
     return res.status(200).json({
       success: true,
@@ -29,6 +31,7 @@ exports.getCurrentUser = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log('Buscando usuario por ID:', userId);
     
     const user = await User.findByPk(userId, {
       attributes: { exclude: ['password'] },
@@ -43,6 +46,7 @@ exports.getUserById = async (req, res) => {
     });
     
     if (!user) {
+      console.log('Usuario no encontrado:', userId);
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
@@ -72,6 +76,8 @@ exports.updateProfile = async (req, res) => {
     const userId = req.user.id;
     const { name, bio, skills, hourlyRate } = req.body;
     
+    console.log('Actualizando perfil de usuario:', userId, req.body);
+    
     const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({
@@ -87,6 +93,8 @@ exports.updateProfile = async (req, res) => {
     if (hourlyRate !== undefined) user.hourlyRate = hourlyRate;
     
     await user.save();
+    
+    console.log('Perfil actualizado correctamente:', userId);
     
     return res.status(200).json({
       success: true,
@@ -118,6 +126,8 @@ exports.uploadProfilePhoto = async (req, res) => {
     
     const userId = req.user.id;
     const photoURL = `/uploads/profiles/${req.file.filename}`;
+    
+    console.log('Subiendo foto de perfil para usuario:', userId, photoURL);
     
     const user = await User.findByPk(userId);
     
@@ -161,7 +171,7 @@ exports.searchUsers = async (req, res) => {
     const { query, role } = req.query;
     const currentUser = req.user;
     
-    console.log("Buscando usuarios, usuario actual:", currentUser?.id);
+    console.log("Buscando usuarios, usuario actual:", currentUser?.id, "query:", query, "role:", role);
     
     // Asegurar que el usuario actual esté autenticado
     if (!currentUser || !currentUser.id) {
@@ -180,7 +190,6 @@ exports.searchUsers = async (req, res) => {
     
     // Añadir filtro por nombre o email si hay query
     if (query) {
-      const { Op } = require('sequelize');
       searchQuery.where = {
         [Op.or]: [
           { name: { [Op.iLike]: `%${query}%` } },
@@ -195,7 +204,6 @@ exports.searchUsers = async (req, res) => {
     }
     
     // Excluir al usuario actual de los resultados
-    const { Op } = require('sequelize');
     searchQuery.where = {
       ...searchQuery.where,
       id: { [Op.ne]: currentUser.id }

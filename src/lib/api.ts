@@ -1,80 +1,138 @@
 
-import { getToken } from './authService';
+import { toast } from '@/components/ui/use-toast';
 
-const API_URL = 'http://localhost:5000/api';
+// Constante para la URL base de la API
+const API_BASE_URL = 'http://localhost:5000/api';
 
 /**
- * Función para realizar peticiones HTTP a la API
- * @param endpoint - Ruta del endpoint (sin la base URL)
- * @param method - Método HTTP (GET, POST, PUT, DELETE)
- * @param body - Cuerpo de la petición (opcional)
- * @returns Promise con la respuesta de la API
+ * Realiza una petición API con autenticación y manejo de errores.
+ * 
+ * @param endpoint Ruta a la que hacer la petición (sin /api inicial)
+ * @param method Método HTTP (GET por defecto)
+ * @param body Cuerpo de la petición para POST, PUT, etc.
+ * @param showToast Mostrar toast de error si algo falla
  */
-export async function apiRequest(
+export const apiRequest = async (
   endpoint: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  body?: any
-) {
-  const token = getToken();
-  
-  const options: RequestInit = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  };
-  
-  // Añadir token de autenticación si existe
-  if (token) {
-    options.headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    };
-  }
-  
-  // Añadir cuerpo de la petición si existe
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-  
+  body?: any,
+  showToast: boolean = false
+) => {
   try {
-    console.log(`API Request: ${method} ${API_URL}${endpoint}`, body);
-    const response = await fetch(`${API_URL}${endpoint}`, options);
-    const contentType = response.headers.get('content-type');
+    const token = localStorage.getItem('token');
     
-    // Verificar si la respuesta es exitosa
+    // Asegurar que el endpoint no comienza con /api (evitar duplicación)
+    const normalizedEndpoint = endpoint.startsWith('/api/') 
+      ? endpoint.substring(5) // Quitar /api/ al inicio
+      : endpoint.startsWith('/') 
+        ? endpoint.substring(1) // Quitar solo / al inicio
+        : endpoint;
+
+    const url = `${API_BASE_URL}/${normalizedEndpoint}`;
+    
+    console.log(`API Request: ${method} ${url}`, body);
+    
+    const headers: Record<string, string> = {
+      'content-type': 'application/json'
+    };
+    
+    if (token) {
+      headers['authorization'] = `Bearer ${token}`;
+    }
+    
+    const options: RequestInit = {
+      method,
+      headers,
+      credentials: 'include',
+    };
+    
+    if (body && method !== 'GET') {
+      options.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(url, options);
+    
     if (!response.ok) {
-      let errorData;
-      
-      // Intentar obtener el mensaje de error como JSON si es posible
-      if (contentType && contentType.includes('application/json')) {
-        errorData = await response.json().catch(() => ({ 
-          message: `Error HTTP: ${response.status} ${response.statusText}` 
-        }));
-      } else {
-        errorData = { message: `Error HTTP: ${response.status} ${response.statusText}` };
-      }
-      
-      const error = new Error(errorData.message || 'Error en la petición') as Error & {
-        status: number;
-        data: any;
-      };
-      error.status = response.status;
-      error.data = errorData;
-      throw error;
+      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
     }
     
-    // Si la respuesta no contiene contenido o no es JSON, devolver un objeto vacío
-    if (!contentType || !contentType.includes('application/json')) {
-      console.log(`API Response (no JSON): ${API_URL}${endpoint}`, response.statusText);
-      return { success: true };
-    }
+    const data = await response.json();
+    console.log(`API Response: ${url}`, data);
     
-    const responseData = await response.json();
-    console.log(`API Response: ${API_URL}${endpoint}`, responseData);
-    return responseData;
+    return data;
   } catch (error) {
-    console.error('Error en la petición API:', error);
+    console.error("Error en la petición API:", error);
+    
+    if (showToast) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error desconocido'
+      });
+    }
+    
     throw error;
   }
-}
+};
+
+/**
+ * Subir archivo o imagen mediante la API.
+ * 
+ * @param endpoint Ruta a la que hacer la petición
+ * @param formData FormData con los archivos y otros campos
+ * @param showToast Mostrar toast de error si algo falla
+ */
+export const apiUpload = async (
+  endpoint: string,
+  formData: FormData,
+  showToast: boolean = false
+) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Asegurar que el endpoint no comienza con /api (evitar duplicación)
+    const normalizedEndpoint = endpoint.startsWith('/api/') 
+      ? endpoint.substring(5) // Quitar /api/ al inicio
+      : endpoint.startsWith('/') 
+        ? endpoint.substring(1) // Quitar solo / al inicio
+        : endpoint;
+    
+    const url = `${API_BASE_URL}/${normalizedEndpoint}`;
+    
+    console.log(`API Upload Request: POST ${url}`);
+    
+    const headers: Record<string, string> = {};
+    
+    if (token) {
+      headers['authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log(`API Upload Response: ${url}`, data);
+    
+    return data;
+  } catch (error) {
+    console.error("Error en la petición de subida:", error);
+    
+    if (showToast) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Error desconocido'
+      });
+    }
+    
+    throw error;
+  }
+};
