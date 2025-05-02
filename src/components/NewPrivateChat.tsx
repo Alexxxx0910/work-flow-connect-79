@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from '@/components/ui/use-toast';
 import { apiRequest } from '@/lib/api';
-import { Loader2, Search } from 'lucide-react';
+import { Loader2, Search, RefreshCw } from 'lucide-react';
 
 interface User {
   id: string;
@@ -27,31 +27,38 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
   const { createPrivateChat, findExistingPrivateChat } = useChat();
 
   // Cargar usuarios de la base de datos
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        console.log("Solicitando lista de usuarios...");
-        
-        const response = await apiRequest('/api/users/search');
-        
-        console.log("Respuesta de búsqueda de usuarios:", response);
-        
-        if (response && response.success && response.users) {
-          setUsers(response.users || []);
-          console.log("Usuarios cargados:", response.users.length);
-          setError(null);
-        } else {
-          throw new Error("Formato de respuesta inválido o error al buscar usuarios");
-        }
-      } catch (err) {
-        console.error("Error al cargar usuarios:", err);
-        setError("No se pudieron cargar los usuarios. Verifica tu conexión.");
-      } finally {
-        setLoading(false);
+  const fetchUsers = async () => {
+    if (!currentUser) {
+      setError("Debes iniciar sesión para acceder a esta función");
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      console.log("Solicitando lista de usuarios...");
+      
+      const response = await apiRequest('/api/users/search');
+      
+      console.log("Respuesta de búsqueda de usuarios:", response);
+      
+      if (response && response.success && Array.isArray(response.users)) {
+        setUsers(response.users);
+        console.log("Usuarios cargados:", response.users.length);
+        setError(null);
+      } else {
+        console.error("Formato de respuesta inválido:", response);
+        throw new Error("Formato de respuesta inválido o error al buscar usuarios");
       }
-    };
+    } catch (err) {
+      console.error("Error al cargar usuarios:", err);
+      setError("No se pudieron cargar los usuarios. Verifica tu conexión.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUsers();
   }, [currentUser]);
 
@@ -130,14 +137,17 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
             <Button 
               variant="outline" 
               size="sm" 
-              className="mt-2"
-              onClick={() => location.reload()}
+              className="mt-2 mx-auto flex items-center"
+              onClick={fetchUsers}
             >
+              <RefreshCw className="h-4 w-4 mr-1" />
               Reintentar
             </Button>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="text-center py-4">No se encontraron usuarios</div>
+          <div className="text-center py-4">
+            {searchTerm ? "No se encontraron usuarios con ese nombre" : "No hay usuarios disponibles"}
+          </div>
         ) : (
           <ul className="space-y-2">
             {filteredUsers.map(user => (

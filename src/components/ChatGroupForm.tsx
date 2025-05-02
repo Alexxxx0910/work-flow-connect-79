@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useChat } from '@/contexts/ChatContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Check, X, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { apiRequest } from '@/lib/api';
 
@@ -26,26 +26,30 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
   const [error, setError] = useState<string | null>(null);
   
   // Cargar usuarios desde la API
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const response = await apiRequest('/api/users/search');
-        
-        if (response && response.success && response.users) {
-          setAllUsers(response.users);
-          setError(null);
-        } else {
-          throw new Error("Error al cargar usuarios");
-        }
-      } catch (err) {
-        console.error("Error al cargar usuarios:", err);
-        setError("No se pudieron cargar los usuarios");
-      } finally {
-        setLoading(false);
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await apiRequest('/api/users/search');
+      
+      console.log("Respuesta de búsqueda de usuarios para grupo:", response);
+      
+      if (response && response.success && Array.isArray(response.users)) {
+        setAllUsers(response.users);
+        console.log("Usuarios cargados para grupo:", response.users.length);
+        setError(null);
+      } else {
+        console.error("Formato de respuesta inválido:", response);
+        throw new Error("Error al cargar usuarios");
       }
-    };
+    } catch (err) {
+      console.error("Error al cargar usuarios para grupo:", err);
+      setError("No se pudieron cargar los usuarios");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUsers();
   }, []);
   
@@ -63,7 +67,7 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
     setSelectedUsers(prev => prev.filter(user => user.id !== userId));
   };
   
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (selectedUsers.length < 1) {
       toast({
         variant: "destructive",
@@ -73,18 +77,27 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
       return;
     }
     
-    // Obtener los IDs de los usuarios seleccionados
-    const participantIds = selectedUsers.map(user => user.id);
-    
-    // Crear el chat grupal
-    createChat(participantIds, groupName || undefined);
-    
-    toast({
-      title: "Chat creado",
-      description: "Se ha creado el chat grupal correctamente"
-    });
-    
-    onClose();
+    try {
+      // Obtener los IDs de los usuarios seleccionados
+      const participantIds = selectedUsers.map(user => user.id);
+      
+      // Crear el chat grupal
+      await createChat(participantIds, groupName || undefined);
+      
+      toast({
+        title: "Chat creado",
+        description: "Se ha creado el chat grupal correctamente"
+      });
+      
+      onClose();
+    } catch (error) {
+      console.error("Error al crear chat grupal:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo crear el chat grupal. Inténtalo de nuevo."
+      });
+    }
   };
 
   return (
@@ -145,7 +158,18 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
           <span className="ml-2">Cargando usuarios...</span>
         </div>
       ) : error ? (
-        <div className="text-center py-4 text-red-500">{error}</div>
+        <div className="text-center py-4">
+          <p className="text-red-500">{error}</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-2 mx-auto flex items-center"
+            onClick={fetchUsers}
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Reintentar
+          </Button>
+        </div>
       ) : searchTerm && (
         <div className="border rounded-md max-h-40 overflow-y-auto">
           {filteredUsers.length === 0 ? (

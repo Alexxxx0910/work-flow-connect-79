@@ -165,6 +165,7 @@ exports.searchUsers = async (req, res) => {
     
     // Asegurar que el usuario actual esté autenticado
     if (!currentUser || !currentUser.id) {
+      console.error("Usuario no autenticado en searchUsers");
       return res.status(401).json({
         success: false,
         message: 'Usuario no autenticado'
