@@ -1,4 +1,3 @@
-
 /**
  * Contexto de Autenticación
  * 
@@ -11,7 +10,7 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { toast } from "@/components/ui/use-toast";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, apiUpload } from "@/lib/api";
 import { UserType } from "@/contexts/DataContext";
 import { 
   saveToken, 
@@ -214,26 +213,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!currentUser) throw new Error('No hay usuario autenticado');
     
     try {
-      // Para subir archivos necesitamos usar FormData en lugar de JSON
-      const formData = new FormData();
-      formData.append('photo', file);
+      // Usamos apiUpload en lugar de implementar la lógica manualmente
+      const data = await apiUpload('users/upload-photo', (() => {
+        const formData = new FormData();
+        formData.append('photo', file);
+        return formData;
+      })());
       
-      // Implementar la lógica de subida usando fetch directamente, ya que apiRequest es para JSON
-      const token = getToken();
-      const response = await fetch(`http://localhost:5000/api/users/upload-photo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al subir la foto');
-      }
-      
-      const data = await response.json();
       const photoURL = data.photoURL;
       
       // Actualizar usuario con la nueva foto

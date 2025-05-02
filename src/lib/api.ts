@@ -1,8 +1,8 @@
 
 import { toast } from '@/components/ui/use-toast';
 
-// Constante para la URL base de la API
-const API_BASE_URL = 'http://localhost:5000/api';
+// Constante para la URL base de la API - Usando URL relativa
+const API_BASE_URL = '/api';
 
 /**
  * Realiza una petición API con autenticación y manejo de errores.
