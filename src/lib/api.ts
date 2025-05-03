@@ -16,7 +16,7 @@ export const apiRequest = async (
   endpoint: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
   body?: any,
-  showToast: boolean = false
+  showToast: boolean = true
 ) => {
   try {
     const token = localStorage.getItem('token');
@@ -33,11 +33,11 @@ export const apiRequest = async (
     console.log(`API Request: ${method} ${url}`, body);
     
     const headers: Record<string, string> = {
-      'content-type': 'application/json'
+      'Content-Type': 'application/json'
     };
     
     if (token) {
-      headers['authorization'] = `Bearer ${token}`;
+      headers['Authorization'] = `Bearer ${token}`;
     }
     
     const options: RequestInit = {
@@ -53,7 +53,9 @@ export const apiRequest = async (
     const response = await fetch(url, options);
     
     if (!response.ok) {
-      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || `Error HTTP: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();
@@ -85,7 +87,7 @@ export const apiRequest = async (
 export const apiUpload = async (
   endpoint: string,
   formData: FormData,
-  showToast: boolean = false
+  showToast: boolean = true
 ) => {
   try {
     const token = localStorage.getItem('token');
@@ -104,7 +106,7 @@ export const apiUpload = async (
     const headers: Record<string, string> = {};
     
     if (token) {
-      headers['authorization'] = `Bearer ${token}`;
+      headers['Authorization'] = `Bearer ${token}`;
     }
     
     const response = await fetch(url, {
@@ -115,7 +117,9 @@ export const apiUpload = async (
     });
     
     if (!response.ok) {
-      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || `Error HTTP: ${response.status} ${response.statusText}`;
+      throw new Error(errorMessage);
     }
     
     const data = await response.json();

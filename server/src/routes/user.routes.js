@@ -46,5 +46,6 @@ router.get('/search', userController.searchUsers);
 router.get('/:userId', userController.getUserById);
 router.put('/profile', validateProfileUpdate, userController.updateProfile);
 router.post('/profile/photo', upload.single('photo'), userController.uploadProfilePhoto);
+router.post('/upload-photo', upload.single('photo'), userController.uploadProfilePhoto); // Ruta alternativa para subida de fotos
 
 module.exports = router;
