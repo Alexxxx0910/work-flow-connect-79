@@ -12,4 +12,9 @@ router.post('/login', authController.login);
 router.post('/logout', verifyToken, authController.logout);
 router.get('/verify', verifyToken, authController.verifySession);
 
+// Añadir una ruta de test para verificar la conectividad
+router.get('/test', (req, res) => {
+  res.json({ message: 'API de autenticación funcionando correctamente' });
+});
+
 module.exports = router;

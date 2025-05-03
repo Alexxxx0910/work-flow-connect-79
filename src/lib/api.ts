@@ -1,8 +1,11 @@
 
 import { toast } from '@/components/ui/use-toast';
 
-// Constante para la URL base de la API - Usando URL relativa
-const API_BASE_URL = '/api';
+// Constante para la URL base de la API
+// En desarrollo, necesitamos la URL completa para evitar que Vite intercepte las solicitudes
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:5000/api' 
+  : '/api';
 
 /**
  * Realiza una petición API con autenticación y manejo de errores.
@@ -56,6 +59,13 @@ export const apiRequest = async (
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.message || `Error HTTP: ${response.status} ${response.statusText}`;
       throw new Error(errorMessage);
+    }
+    
+    // Verificar si la respuesta es HTML (lo que indica un problema con el servidor o proxy)
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('text/html')) {
+      console.error('Recibido HTML en lugar de JSON. Posible problema de configuración del servidor.');
+      throw new Error('Error de configuración del servidor: recibido HTML en lugar de JSON');
     }
     
     const data = await response.json();
@@ -120,6 +130,13 @@ export const apiUpload = async (
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.message || `Error HTTP: ${response.status} ${response.statusText}`;
       throw new Error(errorMessage);
+    }
+    
+    // Verificar si la respuesta es HTML (lo que indica un problema con el servidor o proxy)
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('text/html')) {
+      console.error('Recibido HTML en lugar de JSON. Posible problema de configuración del servidor.');
+      throw new Error('Error de configuración del servidor: recibido HTML en lugar de JSON');
     }
     
     const data = await response.json();
