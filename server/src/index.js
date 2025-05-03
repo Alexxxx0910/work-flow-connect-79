@@ -14,6 +14,7 @@ dotenv.config();
 // Crear la aplicación Express
 const app = express();
 const PORT = process.env.PORT || 5000;
+const FALLBACK_PORT = 5001; // Puerto alternativo si 5000 está en uso
 
 // Middlewares
 app.use(cors()); 
@@ -65,10 +66,32 @@ const startServer = async () => {
       await sequelize.sync({ force: false });
       console.log('Modelos sincronizados con la base de datos.');
       
-      // Iniciar el servidor HTTP
-      server.listen(PORT, () => {
-        console.log(`Servidor iniciado en el puerto ${PORT}`);
-      });
+      // Iniciar el servidor HTTP con manejo de puerto ocupado
+      try {
+        await new Promise((resolve, reject) => {
+          server.listen(PORT, () => {
+            console.log(`Servidor iniciado en el puerto ${PORT}`);
+            resolve();
+          });
+          
+          server.on('error', (e) => {
+            if (e.code === 'EADDRINUSE') {
+              console.warn(`Puerto ${PORT} en uso. Intentando con puerto alternativo ${FALLBACK_PORT}...`);
+              server.listen(FALLBACK_PORT, () => {
+                console.log(`Servidor iniciado en el puerto alternativo ${FALLBACK_PORT}`);
+                // Actualizar .env con el nuevo puerto para futuros inicios
+                console.log('IMPORTANTE: Actualiza el archivo .env con el nuevo puerto para evitar este problema en el futuro.');
+                resolve();
+              });
+            } else {
+              reject(e);
+            }
+          });
+        });
+      } catch (error) {
+        console.error('Error al iniciar el servidor HTTP:', error);
+        process.exit(1);
+      }
     } else {
       console.error('No se pudo iniciar el servidor debido a errores de conexión a la DB.');
       process.exit(1);

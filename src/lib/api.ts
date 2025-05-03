@@ -2,10 +2,8 @@
 import { toast } from '@/components/ui/use-toast';
 
 // Constante para la URL base de la API
-// En desarrollo, necesitamos la URL completa para evitar que Vite intercepte las solicitudes
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:5000/api' 
-  : '/api';
+// En desarrollo, usamos el proxy configurado en vite.config.ts
+const API_BASE_URL = '/api';
 
 /**
  * Realiza una petición API con autenticación y manejo de errores.
