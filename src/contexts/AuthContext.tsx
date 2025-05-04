@@ -11,7 +11,7 @@
 
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { toast } from "@/components/ui/use-toast";
-import { apiRequest, apiUpload } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 import { UserType } from "@/contexts/DataContext";
 import { 
   saveToken, 
@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = getToken();
       if (token) {
         try {
-          const response = await apiRequest('auth/verify');
+          const response = await apiRequest('/auth/verify');
           const user = response.user;
           setCurrentUser(user);
           saveUserData(user);
@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const response = await apiRequest('auth/login', 'POST', { email, password });
+      const response = await apiRequest('/auth/login', 'POST', { email, password });
       const { user, token } = response;
       
       // Guardar token y datos de usuario
@@ -116,7 +116,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string, name: string, role: 'freelancer' | 'client' = 'freelancer') => {
     setLoading(true);
     try {
-      const response = await apiRequest('auth/register', 'POST', { 
+      const response = await apiRequest('/auth/register', 'POST', { 
         email, 
         password, 
         name,
@@ -154,7 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Llamar al endpoint de logout
       if (getToken()) {
-        await apiRequest('auth/logout', 'POST');
+        await apiRequest('/auth/logout', 'POST');
       }
       
       // Limpiar datos locales
@@ -187,7 +187,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!currentUser) throw new Error('No hay usuario autenticado');
     
     try {
-      const response = await apiRequest('users/profile', 'PUT', data);
+      const response = await apiRequest('/users/profile', 'PUT', data);
       const updatedUser = response.user;
       
       saveUserData(updatedUser);
@@ -214,12 +214,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!currentUser) throw new Error('No hay usuario autenticado');
     
     try {
+      // Para subir archivos necesitamos usar FormData en lugar de JSON
       const formData = new FormData();
       formData.append('photo', file);
       
-      // Usar la ruta correcta para subir fotos
-      const data = await apiUpload('users/profile/photo', formData);
+      // Implementar la lógica de subida usando fetch directamente, ya que apiRequest es para JSON
+      const token = getToken();
+      const response = await fetch(`http://localhost:5000/api/users/upload-photo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al subir la foto');
+      }
+      
+      const data = await response.json();
       const photoURL = data.photoURL;
       
       // Actualizar usuario con la nueva foto

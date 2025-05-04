@@ -48,10 +48,6 @@ User.belongsToMany(Chat, {
   as: 'chats' 
 });
 
-// Definir relaciones para ChatParticipant
-ChatParticipant.belongsTo(Chat, { foreignKey: 'chatId', as: 'chat' });
-ChatParticipant.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-
 // Chat y mensajes
 Chat.hasMany(Message, { foreignKey: 'chatId', as: 'messages' });
 Message.belongsTo(Chat, { foreignKey: 'chatId', as: 'chat' });

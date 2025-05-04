@@ -260,8 +260,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     try {
       console.log("Cargando chats para el usuario:", currentUser.id);
       
-      // Corregir la ruta eliminando el "/api" duplicado
-      const response = await apiRequest('/chats');
+      // Cargar chats desde la API
+      const response = await apiRequest('/api/chats');
       if (response && response.chats) {
         // Procesar los chats recibidos para asegurar el formato correcto
         const processedChats = response.chats.map((chat: any) => ({
@@ -275,9 +275,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         
         setChats(processedChats);
         console.log("Chats cargados desde API:", processedChats.length);
-      } else {
-        console.log("No se recibieron chats desde la API o formato incorrecto:", response);
-        setChats([]);
+        setLoadingChats(false);
+        return;
       }
     } catch (error) {
       console.error("Error al cargar chats:", error);
@@ -286,7 +285,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         title: "Error",
         description: "No se pudieron cargar los chats. Por favor, inténtalo de nuevo."
       });
-      setChats([]);
     } finally {
       setLoadingChats(false);
     }
@@ -363,18 +361,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // Intentar enviar mensaje a través del socket
       const socket = getSocket();
       if (socket && socket.connected) {
-        console.log("Enviando mensaje a través de WebSocket");
         await sendSocketMessage(chatId, content);
         return;
       }
       
-      console.log("Socket no disponible, usando API REST");
       // Si no hay socket o no está conectado, usar REST API
-      // Corregir la ruta eliminando el "/api" duplicado
-      const response = await apiRequest(`/chats/${chatId}/messages`, 'POST', { content });
-      console.log("Respuesta de envío de mensaje mediante API REST:", response);
+      const response = await apiRequest(`/api/chats/${chatId}/messages`, 'POST', { content });
+      console.log("Mensaje enviado mediante API REST:", response);
       
       if (response && response.chatMessage) {
+        const realMessage = response.chatMessage;
+        
         // Reemplazar mensaje temporal con el real
         setChats(prevChats => {
           return prevChats.map(chat => {
@@ -382,10 +379,10 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
               return {
                 ...chat,
                 messages: chat.messages.map(msg => 
-                  msg.id === tempMessage.id ? response.chatMessage : msg
+                  msg.id === tempMessage.id ? realMessage : msg
                 ),
-                lastMessage: response.chatMessage,
-                lastMessageAt: new Date(response.chatMessage.createdAt || response.chatMessage.timestamp)
+                lastMessage: realMessage,
+                lastMessageAt: new Date(realMessage.createdAt || realMessage.timestamp)
               };
             }
             return chat;
@@ -399,16 +396,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             return {
               ...prevChat,
               messages: prevChat.messages.map(msg => 
-                msg.id === tempMessage.id ? response.chatMessage : msg
+                msg.id === tempMessage.id ? realMessage : msg
               ),
-              lastMessage: response.chatMessage,
-              lastMessageAt: new Date(response.chatMessage.createdAt || response.chatMessage.timestamp)
+              lastMessage: realMessage,
+              lastMessageAt: new Date(realMessage.createdAt || realMessage.timestamp)
             };
           });
         }
-      } else {
-        console.error("Formato de respuesta incorrecto al enviar mensaje:", response);
-        throw new Error("Formato de respuesta incorrecto");
       }
       return;
     } catch (error) {
@@ -432,22 +426,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       participantIds.push(currentUser.id);
     }
     
-    console.log("Creando chat con participantes:", participantIds, "nombre:", name);
-    
     try {
       // Crear chat a través de la API
-      // Corregir la ruta eliminando el "/api" duplicado
-      const response = await apiRequest('/chats', 'POST', { 
+      const response = await apiRequest('/api/chats', 'POST', { 
         participantIds, 
         name, 
         isGroup: participantIds.length > 2 || !!name 
       });
-      
-      console.log("Respuesta al crear chat:", response);
-      
-      if (!response || !response.success) {
-        throw new Error(response?.message || "Error desconocido al crear chat");
-      }
       
       if (response && response.chat) {
         console.log("Nuevo chat creado mediante API:", response.chat);
@@ -461,10 +446,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         
         // Unirse a la sala del nuevo chat
         joinChatRoom(newChat.id);
-        
-        return newChat;
-      } else {
-        throw new Error("No se recibió información del chat creado");
       }
     } catch (error) {
       console.error("Error al crear chat mediante API:", error);
@@ -473,7 +454,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         title: "Error",
         description: "No se pudo crear el chat. Por favor, inténtalo de nuevo."
       });
-      return null;
     }
   };
 
@@ -484,8 +464,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     if (!currentUser || participantId === currentUser.id) return;
     
     try {
-      console.log("Iniciando creación de chat privado con:", participantId, participantName);
-      
       // Verificar si ya existe un chat privado con este usuario
       const existingChat = findExistingPrivateChat(participantId);
       
@@ -500,7 +478,26 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       // Si no existe, crear un nuevo chat privado
       console.log("Creando nuevo chat privado con usuario:", participantId, participantName);
       
-      return await createChat([currentUser.id, participantId], '');
+      // Crear chat con nombre de usuario para mostrar correctamente
+      const response = await apiRequest('/api/chats', 'POST', {
+        participantIds: [currentUser.id, participantId],
+        name: participantName || '', // Usar nombre del participante
+        isGroup: false
+      });
+      
+      if (response && response.chat) {
+        console.log("Nuevo chat privado creado mediante API:", response.chat);
+        
+        // Refrescar lista de chats
+        await loadChats();
+        
+        // Establecer nuevo chat como activo
+        const newChat = response.chat;
+        setActiveChat(newChat);
+        
+        // Unirse a la sala del chat
+        joinChatRoom(newChat.id);
+      }
     } catch (error) {
       console.error("Error al crear chat privado:", error);
       toast({
@@ -508,7 +505,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         title: "Error",
         description: "No se pudo crear el chat privado. Por favor, inténtalo de nuevo."
       });
-      return null;
     }
   };
 
@@ -525,8 +521,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       if (chat.participants.some(p => p.id === participantId)) return false;
       
       // Añadir participante mediante API
-      // Corregir la ruta eliminando el "/api" duplicado
-      const response = await apiRequest(`/chats/${chatId}/participants`, 'POST', {
+      const response = await apiRequest(`/api/chats/${chatId}/participants`, 'POST', {
         userId: participantId
       });
       

@@ -14,9 +14,7 @@ const ChatParticipant = sequelize.define('ChatParticipant', {
     references: {
       model: 'Chats',
       key: 'id'
-    },
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE'
+    }
   },
   userId: {
     type: DataTypes.UUID,
@@ -24,9 +22,7 @@ const ChatParticipant = sequelize.define('ChatParticipant', {
     references: {
       model: 'Users',
       key: 'id'
-    },
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE'
+    }
   }
 }, {
   timestamps: true,

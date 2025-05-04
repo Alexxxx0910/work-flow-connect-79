@@ -28,7 +28,7 @@ exports.verifyToken = async (req, res, next) => {
     }
     
     // Guardar el usuario en el request para uso posterior
-    req.user = user;
+    req.user = user.toJSON(); // Convertir a JSON plano para evitar problemas con Sequelize
     console.log("Usuario autenticado:", req.user.id); // Log para debug
     next();
   } catch (error) {

@@ -8,17 +8,15 @@ exports.createChat = async (req, res) => {
   try {
     const { participantIds, name = '', isGroup = false } = req.body;
     
-    // Verificar autenticación
+    // Check if req.user exists, otherwise return error
     if (!req.user || !req.user.id) {
       console.error("Error: Usuario no autenticado o sin ID", req.user);
       await t.rollback();
       return res.status(401).json({ success: false, message: 'No autenticado' });
     }
     
-    console.log("Creando chat - Usuario autenticado:", req.user.id);
-    console.log("Datos recibidos:", { participantIds, name, isGroup });
-    
     const currentUserId = req.user.id;
+    console.log("ID de usuario actual:", currentUserId);
     
     if (!Array.isArray(participantIds) || participantIds.length < 1) {
       await t.rollback();
@@ -30,59 +28,74 @@ exports.createChat = async (req, res) => {
     if (!allParticipantIds.includes(currentUserId)) {
       allParticipantIds.push(currentUserId);
     }
-    console.log("Participantes finales:", allParticipantIds);
+    console.log("Participantes del chat:", allParticipantIds);
 
     // Si es un chat privado, verificar si ya existe uno entre estos usuarios
     if (!isGroup && allParticipantIds.length === 2) {
-      console.log("Verificando chat privado existente entre usuarios:", allParticipantIds);
-      
-      // Buscar todos los chats privados donde el usuario actual es participante
-      const userChats = await ChatParticipant.findAll({
-        where: { 
-          userId: currentUserId 
-        },
-        include: [{
-          model: Chat,
-          as: 'chat',
-          where: { isGroup: false },
-          required: true
-        }],
-        transaction: t
-      });
-      
-      // Extraer los IDs de chats donde el usuario actual es participante
-      const userChatIds = userChats.map(cp => cp.chatId);
-      
-      // Buscar si el otro usuario también es participante en alguno de esos chats
-      if (userChatIds.length > 0) {
-        const otherUserId = allParticipantIds.find(id => id !== currentUserId);
-        
-        const existingChat = await ChatParticipant.findOne({
-          where: {
-            chatId: { [Op.in]: userChatIds },
-            userId: otherUserId
+      try {
+        const [existingChats] = await sequelize.query(`
+          SELECT c.id FROM "Chats" c
+          WHERE c."isGroup" = false
+          AND (
+            SELECT COUNT(*) FROM "ChatParticipants" cp
+            WHERE cp."chatId" = c.id
+          ) = 2
+          AND EXISTS (
+            SELECT 1 FROM "ChatParticipants" cp1
+            WHERE cp1."chatId" = c.id AND cp1."userId" = :userId1
+          )
+          AND EXISTS (
+            SELECT 1 FROM "ChatParticipants" cp2
+            WHERE cp2."chatId" = c.id AND cp2."userId" = :userId2
+          )
+        `, {
+          replacements: { 
+            userId1: allParticipantIds[0],
+            userId2: allParticipantIds[1]
           },
-          include: [{
-            model: Chat,
-            as: 'chat',
-            include: [{
-              model: User,
-              as: 'participants',
-              through: { attributes: [] }
-            }]
-          }],
+          type: sequelize.QueryTypes.SELECT,
           transaction: t
         });
         
-        if (existingChat) {
-          console.log("Chat privado ya existe:", existingChat.chatId);
+        if (existingChats && existingChats.length > 0) {
+          const existingChatId = existingChats[0].id;
+          
+          // Si existe, obtener el chat completo
+          const existingChat = await Chat.findByPk(existingChatId, {
+            include: [
+              {
+                model: User,
+                as: 'participants',
+                attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen']
+              },
+              {
+                model: Message,
+                as: 'messages',
+                limit: 20,
+                order: [['createdAt', 'DESC']],
+                include: [
+                  {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'photoURL']
+                  }
+                ]
+              }
+            ],
+            transaction: t
+          });
+          
           await t.commit();
+          console.log("Chat existente recuperado:", existingChatId);
           return res.status(200).json({ 
             success: true, 
-            chat: existingChat.chat,
+            chat: existingChat,
             message: 'Chat existente recuperado' 
           });
         }
+      } catch (error) {
+        console.error("Error al verificar chat existente:", error);
+        // Continuamos con la creación del chat
       }
     }
     
@@ -126,7 +139,7 @@ exports.createChat = async (req, res) => {
         {
           model: User,
           as: 'participants',
-          through: { attributes: [] }
+          attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen']
         }
       ],
       transaction: t
@@ -150,7 +163,7 @@ exports.createChat = async (req, res) => {
 // Obtener todos los chats del usuario
 exports.getChats = async (req, res) => {
   try {
-    // Verificar autenticación
+    // Check if req.user exists, otherwise return error
     if (!req.user || !req.user.id) {
       console.error("Error: Usuario no autenticado o sin ID en getChats", req.user);
       return res.status(401).json({ success: false, message: 'No autenticado' });
@@ -159,14 +172,13 @@ exports.getChats = async (req, res) => {
     const userId = req.user.id;
     console.log("Obteniendo chats para usuario:", userId);
     
-    // Obtener todos los chats donde el usuario es participante
+    // Obtener chats del usuario y sus participantes usando Sequelize directamente
     const userChats = await Chat.findAll({
       include: [
         {
           model: User,
           as: 'participants',
-          attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen'],
-          through: { attributes: [] }
+          attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen']
         },
         {
           model: Message,
@@ -188,9 +200,9 @@ exports.getChats = async (req, res) => {
           model: User,
           as: 'participants',
           attributes: ['id', 'name', 'photoURL', 'isOnline', 'lastSeen'],
-          where: { id: userId },
-          through: { attributes: [] },
-          required: true
+          through: {
+            attributes: []
+          }
         },
         {
           model: Message,
@@ -213,7 +225,6 @@ exports.getChats = async (req, res) => {
     
     // Procesar los chats para el formato adecuado
     const chatsWithDetails = userChats.map(chat => {
-      // Asegurarnos de que los mensajes estén definidos
       const messages = chat.messages || [];
       const sortedMessages = [...messages].sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -227,7 +238,7 @@ exports.getChats = async (req, res) => {
         name: chat.name,
         isGroup: chat.isGroup,
         lastMessageAt: chat.lastMessageAt,
-        participants: chat.participants || [],
+        participants: chat.participants,
         messages: sortedMessages.map(msg => ({
           id: msg.id,
           content: msg.content,

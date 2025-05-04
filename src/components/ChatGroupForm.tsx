@@ -1,65 +1,28 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useChat } from '@/contexts/ChatContext';
+import { useData, UserType } from '@/contexts/DataContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Check, X, Loader2, RefreshCw } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { apiRequest } from '@/lib/api';
-
-interface User {
-  id: string;
-  name: string;
-  photoURL: string;
-  role: string;
-}
 
 export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
   const { createChat } = useChat();
+  const { getAllUsers } = useData();
   const [groupName, setGroupName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<UserType[]>([]);
   
-  // Cargar usuarios desde la API
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      // Corregir la ruta eliminando el "/api" duplicado
-      const response = await apiRequest('/users/search');
-      
-      console.log("Respuesta de búsqueda de usuarios para grupo:", response);
-      
-      if (response && response.success && Array.isArray(response.users)) {
-        setAllUsers(response.users);
-        console.log("Usuarios cargados para grupo:", response.users.length);
-        setError(null);
-      } else {
-        console.error("Formato de respuesta inválido:", response);
-        throw new Error("Error al cargar usuarios");
-      }
-    } catch (err) {
-      console.error("Error al cargar usuarios para grupo:", err);
-      setError("No se pudieron cargar los usuarios");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  const allUsers = getAllUsers();
   
   const filteredUsers = allUsers.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
     !selectedUsers.some(selected => selected.id === user.id)
   );
 
-  const handleSelectUser = (user: User) => {
+  const handleSelectUser = (user: UserType) => {
     setSelectedUsers(prev => [...prev, user]);
     setSearchTerm('');
   };
@@ -68,7 +31,7 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
     setSelectedUsers(prev => prev.filter(user => user.id !== userId));
   };
   
-  const handleCreateGroup = async () => {
+  const handleCreateGroup = () => {
     if (selectedUsers.length < 1) {
       toast({
         variant: "destructive",
@@ -78,27 +41,18 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
       return;
     }
     
-    try {
-      // Obtener los IDs de los usuarios seleccionados
-      const participantIds = selectedUsers.map(user => user.id);
-      
-      // Crear el chat grupal
-      await createChat(participantIds, groupName || undefined);
-      
-      toast({
-        title: "Chat creado",
-        description: "Se ha creado el chat grupal correctamente"
-      });
-      
-      onClose();
-    } catch (error) {
-      console.error("Error al crear chat grupal:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo crear el chat grupal. Inténtalo de nuevo."
-      });
-    }
+    // Obtener los IDs de los usuarios seleccionados
+    const participantIds = selectedUsers.map(user => user.id);
+    
+    // Crear el chat grupal
+    createChat(participantIds, groupName || undefined);
+    
+    toast({
+      title: "Chat creado",
+      description: "Se ha creado el chat grupal correctamente"
+    });
+    
+    onClose();
   };
 
   return (
@@ -153,25 +107,7 @@ export const ChatGroupForm = ({ onClose }: { onClose: () => void }) => {
         />
       </div>
       
-      {loading ? (
-        <div className="flex justify-center items-center py-4">
-          <Loader2 className="h-5 w-5 animate-spin text-wfc-purple" />
-          <span className="ml-2">Cargando usuarios...</span>
-        </div>
-      ) : error ? (
-        <div className="text-center py-4">
-          <p className="text-red-500">{error}</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-2 mx-auto flex items-center"
-            onClick={fetchUsers}
-          >
-            <RefreshCw className="h-4 w-4 mr-1" />
-            Reintentar
-          </Button>
-        </div>
-      ) : searchTerm && (
+      {searchTerm && (
         <div className="border rounded-md max-h-40 overflow-y-auto">
           {filteredUsers.length === 0 ? (
             <p className="text-sm text-gray-500 p-2">No se encontraron usuarios</p>

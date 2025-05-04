@@ -1,12 +1,13 @@
 
-const userService = require('../services/userService');
+const { User, Job } = require('../models');
+const fs = require('fs').promises;
+const path = require('path');
 
 /**
  * Obtener información del usuario actual
  */
 exports.getCurrentUser = async (req, res) => {
   try {
-    console.log('Obteniendo usuario actual:', req.user?.id);
     // El usuario ya está en req.user gracias al middleware de autenticación
     return res.status(200).json({
       success: true,
@@ -28,12 +29,20 @@ exports.getCurrentUser = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
-    console.log('Buscando usuario por ID:', userId);
     
-    const user = await userService.getUserById(userId);
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ['password'] },
+      include: [
+        {
+          model: Job,
+          as: 'jobs',
+          limit: 5,
+          order: [['createdAt', 'DESC']]
+        }
+      ]
+    });
     
     if (!user) {
-      console.log('Usuario no encontrado:', userId);
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
@@ -61,10 +70,9 @@ exports.getUserById = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log('Actualizando perfil de usuario:', userId, req.body);
+    const { name, bio, skills, hourlyRate } = req.body;
     
-    const user = await userService.updateProfile(userId, req.body);
-    
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -72,7 +80,13 @@ exports.updateProfile = async (req, res) => {
       });
     }
     
-    console.log('Perfil actualizado correctamente:', userId);
+    // Actualizar campos
+    if (name) user.name = name;
+    if (bio !== undefined) user.bio = bio;
+    if (skills) user.skills = skills;
+    if (hourlyRate !== undefined) user.hourlyRate = hourlyRate;
+    
+    await user.save();
     
     return res.status(200).json({
       success: true,
@@ -95,11 +109,33 @@ exports.updateProfile = async (req, res) => {
  */
 exports.uploadProfilePhoto = async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se ha subido ninguna imagen'
+      });
+    }
+    
     const userId = req.user.id;
+    const photoURL = `/uploads/profiles/${req.file.filename}`;
     
-    console.log('Subiendo foto de perfil para usuario:', userId);
+    const user = await User.findByPk(userId);
     
-    const photoURL = await userService.updateProfilePhoto(userId, req.file);
+    // Eliminar foto anterior si existe
+    if (user.photoURL && user.photoURL !== '') {
+      try {
+        const oldPhotoPath = path.join(__dirname, '../../', user.photoURL);
+        await fs.access(oldPhotoPath);
+        await fs.unlink(oldPhotoPath);
+      } catch (err) {
+        // Si el archivo no existe, ignoramos el error
+        console.log('No se pudo eliminar la foto anterior:', err);
+      }
+    }
+    
+    // Actualizar URL de la foto
+    user.photoURL = photoURL;
+    await user.save();
     
     return res.status(200).json({
       success: true,
@@ -123,21 +159,28 @@ exports.uploadProfilePhoto = async (req, res) => {
 exports.searchUsers = async (req, res) => {
   try {
     const { query, role } = req.query;
-    const currentUser = req.user;
+    const searchQuery = {
+      attributes: { exclude: ['password'] },
+      where: {}
+    };
     
-    console.log("Buscando usuarios, usuario actual:", currentUser?.id, "query:", query, "role:", role);
-    
-    // Asegurar que el usuario actual esté autenticado
-    if (!currentUser || !currentUser.id) {
-      console.error("Usuario no autenticado en searchUsers");
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario no autenticado'
-      });
+    // Añadir filtro por nombre o email si hay query
+    if (query) {
+      const { Op } = require('sequelize');
+      searchQuery.where = {
+        [Op.or]: [
+          { name: { [Op.iLike]: `%${query}%` } },
+          { email: { [Op.iLike]: `%${query}%` } }
+        ]
+      };
     }
     
-    const users = await userService.searchUsers(query, role, currentUser.id);
-    console.log(`Se encontraron ${users.length} usuarios (excluyendo al usuario actual ${currentUser.id})`);
+    // Añadir filtro por rol si se especifica
+    if (role && ['freelancer', 'client'].includes(role)) {
+      searchQuery.where.role = role;
+    }
+    
+    const users = await User.findAll(searchQuery);
     
     return res.status(200).json({
       success: true,

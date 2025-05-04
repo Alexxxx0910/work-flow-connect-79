@@ -2,12 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
 import { toast } from '@/components/ui/use-toast';
-import { apiRequest } from '@/lib/api';
-import { Loader2, Search, RefreshCw } from 'lucide-react';
+import axios from 'axios';
+import { Loader2 } from 'lucide-react';
 
 interface User {
   id: string;
@@ -24,42 +23,45 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
   const [error, setError] = useState<string | null>(null);
   
   const { currentUser } = useAuth();
-  const { createPrivateChat, findExistingPrivateChat } = useChat();
+  const { createPrivateChat, chats, findExistingPrivateChat } = useChat();
 
   // Cargar usuarios de la base de datos
-  const fetchUsers = async () => {
-    if (!currentUser) {
-      setError("Debes iniciar sesión para acceder a esta función");
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      console.log("Solicitando lista de usuarios...");
-      
-      // Corregir la ruta eliminando el "/api" duplicado
-      const response = await apiRequest('/users/search');
-      
-      console.log("Respuesta de búsqueda de usuarios:", response);
-      
-      if (response && response.success && Array.isArray(response.users)) {
-        setUsers(response.users);
-        console.log("Usuarios cargados:", response.users.length);
-        setError(null);
-      } else {
-        console.error("Formato de respuesta inválido:", response);
-        throw new Error("Formato de respuesta inválido o error al buscar usuarios");
-      }
-    } catch (err) {
-      console.error("Error al cargar usuarios:", err);
-      setError("No se pudieron cargar los usuarios. Verifica tu conexión.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get('http://localhost:5000/api/users/search', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        
+        // Filtrar para no incluir al usuario actual
+        if (currentUser) {
+          const filteredUsers = response.data.users.filter(
+            (user: User) => user.id !== currentUser.id
+          );
+          setUsers(filteredUsers);
+        } else {
+          setUsers(response.data.users || []);
+        }
+      } catch (err) {
+        console.error("Error al cargar usuarios:", err);
+        setError("No se pudieron cargar los usuarios. Verifica tu conexión.");
+        
+        // Usar usuarios de ejemplo para desarrollo
+        const mockUsers = [
+          { id: '1', name: 'Ana Pérez', photoURL: '', role: 'Diseñador' },
+          { id: '2', name: 'Carlos López', photoURL: '', role: 'Desarrollador' },
+          { id: '3', name: 'María Rodríguez', photoURL: '', role: 'Project Manager' },
+        ];
+        setUsers(mockUsers);
+        console.info("Usuarios mock cargados");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchUsers();
   }, [currentUser]);
 
@@ -75,7 +77,6 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
     
     try {
       setCreatingChat(true);
-      console.log("Iniciando chat con usuario:", userId, userName);
       
       // Verificar si ya existe un chat con este usuario
       const existingChat = findExistingPrivateChat(userId);
@@ -116,15 +117,13 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="relative">
-        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Buscar usuarios..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-8"
-        />
-      </div>
+      <h3 className="font-medium text-lg">Nuevo chat privado</h3>
+      
+      <Input
+        placeholder="Buscar usuarios..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
 
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
@@ -133,22 +132,9 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
             <span className="ml-2">Cargando usuarios...</span>
           </div>
         ) : error ? (
-          <div className="text-center py-4 text-red-500">
-            {error}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-2 mx-auto flex items-center"
-              onClick={fetchUsers}
-            >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Reintentar
-            </Button>
-          </div>
+          <div className="text-center py-4 text-red-500">{error}</div>
         ) : filteredUsers.length === 0 ? (
-          <div className="text-center py-4">
-            {searchTerm ? "No se encontraron usuarios con ese nombre" : "No hay usuarios disponibles"}
-          </div>
+          <div className="text-center py-4">No se encontraron usuarios</div>
         ) : (
           <ul className="space-y-2">
             {filteredUsers.map(user => (
@@ -166,7 +152,7 @@ export const NewPrivateChat = ({ onClose }: { onClose: () => void }) => {
                   </Avatar>
                   <div>
                     <div className="font-medium">{user.name}</div>
-                    <div className="text-xs text-gray-500">{user.role || 'Usuario'}</div>
+                    <div className="text-xs text-gray-500">{user.role}</div>
                   </div>
                 </div>
                 {creatingChat && (
